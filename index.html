@@ -99,8 +99,8 @@ details summary{cursor:pointer;color:var(--leaf);font-weight:600;padding:6px 0}
 .actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
 .actions button{min-height:40px;padding:0 14px;border-radius:9px;font-weight:600;border:1.5px solid var(--line);background:transparent}
 .actions .yes{background:var(--leaf);color:var(--surface);border-color:var(--leaf)}
-.tabs{display:flex;gap:4px;margin:0 0 14px;border-bottom:1px solid var(--line)}
-.tabs button{background:none;border:0;padding:10px 12px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:0 4px;margin:0 0 14px;border-bottom:1px solid var(--line)}
+.tabs button{background:none;border:0;padding:10px 4px;font-size:.95rem;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
 .tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--pom)}
 .filters{display:flex;gap:8px;flex-wrap:wrap}
 .filters label{flex:1;min-width:140px;font-weight:600;font-size:.9rem}
@@ -123,8 +123,6 @@ details summary{cursor:pointer;color:var(--leaf);font-weight:600;padding:6px 0}
 .empty{color:var(--muted);text-align:center;padding:32px 8px}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:5}
 .toast.show{opacity:1}
-.tabs{overflow-x:auto;white-space:nowrap;scrollbar-width:none}
-.tabs button{flex:0 0 auto}
 .bkh{font-size:1.15rem;margin:22px 0 8px}
 .bkgrid{display:grid;grid-template-columns:1fr 70px 62px 76px;gap:6px;align-items:center;margin-bottom:6px}
 .bkgrid.three{grid-template-columns:1fr 54px 76px 70px}
@@ -295,6 +293,7 @@ details summary{cursor:pointer;color:var(--leaf);font-weight:600;padding:6px 0}
 .sw input:checked + span{border-color:var(--ink)}
 .sw input:focus-visible + span{outline:3px solid var(--tag);outline-offset:2px}
 .fhead .ghost{margin-left:4px}
+.ghost.danger{color:var(--bad,#B3123A);border-color:currentColor;margin:10px 0 0}
 .fhead img{width:32px;height:32px}
 .fphoto{width:48px;height:48px;border-radius:10px;object-fit:cover;display:block}
 .fruit .fphoto{width:56px;height:56px}
@@ -391,7 +390,8 @@ function parseSizes(v){
 }
 function normFruit(f){
   const n = { ...f, price:Number(f.price), step:Number(f.step) || 1, trayQty:Number(f.trayQty), trayNet:Number(f.trayNet) || Number(f.trayQty), trayCost:Number(f.trayCost) || 0,
-    active: f.active === true || f.active === "TRUE" || f.active === "true" };
+    active: f.active === true || f.active === "TRUE" || f.active === "true",
+    deleted: f.deleted === true || f.deleted === "TRUE" || f.deleted === "true" };
   n.profitPct = f.profitPct === "" || f.profitPct == null ? PROFIT_PCT : Number(f.profitPct);
   n.storePct = f.storePct === "" || f.storePct == null ? STORE_PCT : Number(f.storePct);
   n.auto = f.auto === "" || f.auto == null ? n.trayCost > 0 : (f.auto === true || f.auto === "TRUE" || f.auto === "true");
@@ -590,7 +590,7 @@ const api = {
 
 /* ===== State ===== */
 const S = {
-  view:"shop", lastView:"", fruits:[], cart:{}, loadError:"",
+  view:"shop", lastView:"", fruits:[], goneFruits:[], cart:{}, loadError:"",
   customer: LS.get("fs_me", { name:"", phone:"", shop:"" }),
   myOrders: LS.get("fs_my", []), mine:null, lastOrder:null,
   ownerKey: LS.get("fs_owner", ""), ownerTab:"orders", ownerOrders:[], ownerDate: pickupDate(), ownerShop:"all", editFruits:null,
@@ -600,6 +600,10 @@ const S = {
   book:[], bookDate: ymd(ist()), bookShop:"1town", bookDraft:null
 };
 const fruitById = id => S.fruits.find(f => f.id === id);
+/* Deleted fruits stay in the saved list (hidden) so old Daily book records and orders keep their name and numbers. */
+const fruitAny = id => fruitById(id) || (S.goneFruits || []).find(f => f.id === id);
+const allFruits = () => S.fruits.concat(S.goneFruits || []);
+function setFruits(list){ const all = list.map(normFruit); S.fruits = all.filter(f => !f.deleted); S.goneFruits = all.filter(f => f.deleted); }
 function cartItem(key){
   const [fid, sid] = String(key).split("@"), f = fruitById(fid);
   if (!f) return null;
@@ -807,12 +811,12 @@ function ownerTraysHtml(){
   const qty = {}, pcs = {};
   ownerDayOrders(false).forEach(o => (o.items || []).forEach(i => {
     if (i.size){
-      const f = fruitById(i.id), s = f && (f.sizes || []).find(x => x.id === i.size);
+      const f = fruitAny(i.id), s = f && (f.sizes || []).find(x => x.id === i.size);
       qty[i.id] = (qty[i.id] || 0) + (Number(i.kg) || (s ? midKg(s) * Number(i.qty) : 0));
       const label = s ? s.name : i.size; pcs[i.id] = pcs[i.id] || {}; pcs[i.id][label] = (pcs[i.id][label] || 0) + Number(i.qty);
     } else qty[i.id] = (qty[i.id] || 0) + Number(i.qty);
   }));
-  const rows = S.fruits.filter(f => qty[f.id] > 0).map(f => {
+  const rows = allFruits().filter(f => qty[f.id] > 0).map(f => {
     const q = r1(qty[f.id]), size = Number(f.trayQty) || 1;
     const trays = Math.ceil(q / size), left = r1(trays * size - q);
     const lastFill = q - (trays - 1) * size, pct = Math.round(lastFill / size * 100);
@@ -859,7 +863,7 @@ function appSales(shop, date){
 }
 function calcShop(d){
   const out = { lines:[], cost:0, wasteCost:0, spent:0, missingCost:[], uncounted:[], noOpen:[], negative:[] };
-  S.fruits.forEach(f => {
+  allFruits().forEach(f => {
     const x = d.fruits && d.fruits[f.id]; if (!x) return;
     const net = netOf(f), trays = num(x.trays), tc = num(x.trayCost);
     if (blank(x.open) && trays === 0 && blank(x.close)) return;
@@ -1024,7 +1028,7 @@ function aiContext(){
   dayList(today, 14).forEach(ds => CONFIG.SHOPS.forEach(s => {
     const r = bookRow(s.id, ds); if (!r) return;
     const c = calcShop(r), fr = {};
-    Object.keys(r.fruits || {}).forEach(id => { const x = r.fruits[id], f = fruitById(id); if (!f) return;
+    Object.keys(r.fruits || {}).forEach(id => { const x = r.fruits[id], f = fruitAny(id); if (!f) return;
       const l = c.lines.find(z => z.f.id === id);
       fr[id] = { open:x.open, trays:x.trays || 0, tray_cost:x.trayCost, left:x.close, thrown:x.waste, sold: l && l.counted ? l.sold : undefined }; });
     days.push({ date:ds, shop:s.id, profit:c.profit, sales:c.revenue, cash:c.cash, counter_upi:c.upi, app:c.app, fruit_cost:c.cost, waste_cost:c.wasteCost, other_costs:c.exp, complete:c.complete, fruits:fr });
@@ -1142,7 +1146,7 @@ async function aiApply(t){
     case "set_money": return aiBookPatch(a.shop, a.date, d => { if (a.cash != null) d.cash = a.cash; if (a.counter_upi != null) d.upi = a.counter_upi; if (a.other_costs != null) d.expenses = a.other_costs; });
     case "update_fruit": {
       const list = JSON.parse(JSON.stringify(S.fruits)); const f = list.find(x => x.id === a.fruit_id); aiFruitPatch(f, a);
-      S.fruits = (await api.saveFruits(S.ownerKey, list)).map(normFruit); S.editFruits = null; return;
+      setFruits(await api.saveFruits(S.ownerKey, list.concat(S.goneFruits))); S.editFruits = null; return;
     }
     case "update_order_status": { await api.updateOrder(S.ownerKey, a.order_id, a.status); const o = S.ownerOrders.find(x => x.id === a.order_id); if (o) o.status = a.status; return; }
   }
@@ -1352,7 +1356,7 @@ function profitText(f){
   return `Break-even ${rupee(cost / size)}/${UNIT[f.unit].short}. Full ${t} at this price: ${p >= 0 ? rupee(p) + " profit" : rupee(-p) + " loss"}.`;
 }
 function ownerFruitsHtml(){
-  if (!S.editFruits) S.editFruits = JSON.parse(JSON.stringify(S.fruits));
+  if (!S.editFruits){ S.editFruits = JSON.parse(JSON.stringify(S.fruits)); S.editGone = JSON.parse(JSON.stringify(S.goneFruits || [])); }
   return `<p class="banner">Check every price before you share the app. Net weight is what the tray weighs. Sellable is what you can sell after wastage.</p>
   <div class="card allpct">
     <p class="lbl" style="margin:0 0 6px">For all fruits with automatic prices</p>
@@ -1391,6 +1395,7 @@ function ownerFruitsHtml(){
         ${f.unit === "box" ? `<label class="lbl">Box size<input class="in" data-field="boxSize" data-text="1" value="${esc(f.boxSize || "")}" placeholder="125 g"></label>` : ""}
         <p class="lbl" style="margin-bottom:6px">Colour (shown when there's no photo)</p>
         <div class="swatches">${PALETTE.map(c => `<button class="swb ${f.color === c ? "on" : ""}" style="background:${c}" data-act="setColor" data-id="${esc(f.id)}" data-arg="${c}" aria-label="Colour ${c}" aria-pressed="${f.color === c}"></button>`).join("")}</div>
+        <button class="ghost danger" data-act="deleteFruit" data-id="${esc(f.id)}">Delete fruit</button>
         <p class="note" style="margin-top:8px">Sold by ${f.unit === "kg" ? "kg" : f.unit === "piece" ? "piece" : "box"}. This can't be changed, so your past records stay correct.</p>
       </div>` : ""}
     </li>`).join("")}</ul>
@@ -1575,7 +1580,7 @@ const ACTIONS = {
     } catch(e){ btn.disabled = false; setErr(e.message || "Couldn't save. Check your internet and try again."); return false; }
   },
   async refresh(){
-    try { S.ownerOrders = await api.orders(S.ownerKey); S.book = await api.book(S.ownerKey); S.fruits = (await api.fruits()).map(normFruit); S.editFruits = null; S.bookDraft = null; render(); toast("Up to date"); }
+    try { S.ownerOrders = await api.orders(S.ownerKey); S.book = await api.book(S.ownerKey); setFruits(await api.fruits()); S.editFruits = null; S.editGone = null; S.bookDraft = null; render(); toast("Up to date"); }
     catch(e){ toast(e.message || "Couldn't refresh"); }
   },
   async setStatus(id, status, btn){
@@ -1639,6 +1644,13 @@ const ACTIONS = {
     if (id === "__new"){ S.newPhoto = ""; S.addOpen = true; render(); return; }
     const f = S.editFruits.find(x => x.id === id); if (f){ f.photo = ""; render(); toast("Photo removed. Press Save prices to keep this."); }
   },
+  deleteFruit(id){
+    const f = S.editFruits.find(x => x.id === id); if (!f) return;
+    if (!confirm(`Delete ${f.name}? Its past Daily book records stay, but it will disappear from the app.`)) return;
+    S.editFruits = S.editFruits.filter(x => x.id !== id);
+    if (!f._new){ const { _new, ...keep } = f; (S.editGone = S.editGone || []).push(keep); }
+    S.editOpen = null; render(); toast("Deleted. Press Save prices to keep this.");
+  },
   removeNewFruit(id){ S.editFruits = S.editFruits.filter(f => !(f.id === id && f._new)); render(); },
   async saveFruits(_, __, btn){
     const noName = S.editFruits.find(f => !String(f.name || "").trim());
@@ -1654,8 +1666,8 @@ const ACTIONS = {
     if (bad) return setErr(`${bad.name} needs a price and a tray size, or turn it off.`);
     btn.disabled = true;
     S.editFruits.forEach(f => { applyAuto(f); if (!(Number(f.storePrice) > 0)) f.storePrice = f.price; });
-    const clean = S.editFruits.map(({ _new, ...f }) => f);
-    try { S.fruits = (await api.saveFruits(S.ownerKey, clean)).map(normFruit); S.editFruits = null; render(); toast("Prices saved"); }
+    const clean = S.editFruits.map(({ _new, ...f }) => f).concat((S.editGone || []).map(f => ({ ...f, deleted:true, active:false })));
+    try { setFruits(await api.saveFruits(S.ownerKey, clean)); S.editFruits = null; S.editGone = null; render(); toast("Prices saved"); }
     catch(e){ btn.disabled = false; setErr(e.message || "Couldn't save prices."); }
   }
 };
@@ -1726,7 +1738,7 @@ document.addEventListener("change", e => {
 
 /* ===== Start ===== */
 async function loadFruits(){
-  try { S.fruits = (await api.fruits()).map(normFruit); }
+  try { setFruits(await api.fruits()); }
   catch(e){ S.loadError = e.message || "load failed"; }
 }
 (async function init(){
