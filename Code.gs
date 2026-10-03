@@ -9,7 +9,7 @@
 const CUTOFF_HOUR = 21;            // 9 PM IST, must match index.html
 const SHOPS = ["1town", "2town"];
 const STATUSES = ["pending", "paid", "picked", "rejected"];
-const FRUIT_COLS = ["id","name","te","unit","price","step","trayQty","trayCost","color","active","trayNet","boxSize","photo","storePrice","auto","profitPct","storePct","sizes"];
+const FRUIT_COLS = ["id","name","te","unit","price","step","trayQty","trayCost","color","active","trayNet","boxSize","photo","storePrice","auto","profitPct","storePct","sizes","deleted"];
 const BOOK_COLS = ["date","shop","data","updated"];
 const ORDER_COLS = ["id","created","name","phone","shop","pickupDate","items","total","utr","status"];
 
@@ -36,7 +36,7 @@ function setup(){
       ["pineapple","Pineapple","అనాస","size",0,1,0,0,"#F08A1C",false,0,"","",0,true,10,10,'[{"id":"s1","name":"Small","min":0.8,"max":1.2},{"id":"s2","name":"Big","min":1.2,"max":1.8}]']
     ].forEach(r => f.appendRow(r));
   }
-  ["trayNet","boxSize","photo","storePrice","auto","profitPct","storePct","sizes"].forEach(c => { const col = FRUIT_COLS.indexOf(c) + 1; if (f.getRange(1, col).getValue() !== c) f.getRange(1, col).setValue(c); });
+  ["trayNet","boxSize","photo","storePrice","auto","profitPct","storePct","sizes","deleted"].forEach(c => { const col = FRUIT_COLS.indexOf(c) + 1; if (f.getRange(1, col).getValue() !== c) f.getRange(1, col).setValue(c); });
   let bk = b.getSheetByName("Book") || b.insertSheet("Book");
   if (bk.getLastRow() === 0){ bk.getRange("A:D").setNumberFormat("@"); bk.appendRow(BOOK_COLS); bk.setFrozenRows(1); }
   if (o.getLastRow() === 0){
@@ -91,7 +91,8 @@ function readFruits_(){
     trayNet: Number(f.trayNet) || Number(f.trayQty), boxSize: String(f.boxSize || ""), photo: String(f.photo || ""),
     storePrice: Number(f.storePrice) || 0, auto: f.auto === "" ? "" : (f.auto === true || String(f.auto).toUpperCase() === "TRUE"),
     profitPct: f.profitPct === "" ? "" : Number(f.profitPct), storePct: f.storePct === "" ? "" : Number(f.storePct),
-    sizes: parseSizes_(f.sizes)
+    sizes: parseSizes_(f.sizes),
+    deleted: f.deleted === true || String(f.deleted).toUpperCase() === "TRUE"
   }));
 }
 function dateStr_(v){
@@ -175,7 +176,7 @@ function saveFruits_(list){
   });
   const rows = list.map(f => [String(f.id), String(f.name), String(f.te || ""), String(f.unit), Number(f.price) || 0, Number(f.step) || 1,
     Number(f.trayQty) || 0, Number(f.trayCost) || 0, String(f.color || "#B3123A"), !!f.active, Number(f.trayNet) || Number(f.trayQty) || 0, String(f.boxSize || "").slice(0, 20), cleanPhoto_(f.photo), Number(f.storePrice) || Number(f.price) || 0, !!f.auto, Number(f.profitPct) || 0, Number(f.storePct) || 0,
-    f.unit === "size" ? JSON.stringify(parseSizes_(f.sizes)) : ""]);
+    f.unit === "size" ? JSON.stringify(parseSizes_(f.sizes)) : "", !!f.deleted]);
   const sh = sheet_("Fruits");
   if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, FRUIT_COLS.length).clearContent();
   sh.getRange(2, 1, rows.length, FRUIT_COLS.length).setValues(rows);
