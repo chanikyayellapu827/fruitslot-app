@@ -121,6 +121,13 @@ details summary{cursor:pointer;color:var(--leaf);font-weight:600;padding:6px 0}
 .banner{background:color-mix(in srgb,var(--tag) 28%,var(--surface));border-radius:10px;padding:10px 12px;margin:0 0 12px;font-size:.95rem}
 .foot{margin-top:28px;display:flex;flex-direction:column;gap:2px;align-items:flex-start;color:var(--muted);font-size:.9rem}
 .empty{color:var(--muted);text-align:center;padding:32px 8px}
+.unsaved{position:fixed;left:0;right:0;bottom:0;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface);border-top:2px solid var(--pom);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
+.unsaved[hidden]{display:none}
+.unsaved strong{font-size:1rem}
+.unsaved .primary{min-height:44px}
+.hidlbl{margin:0 0 8px;font-size:.88rem;font-weight:700;color:var(--muted)}
+.hidlbl[hidden]{display:none}
+.onsale{margin:0 0 10px;font-weight:700}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:5}
 .toast.show{opacity:1}
 .bkh{font-size:1.15rem;margin:22px 0 8px}
@@ -327,6 +334,7 @@ details summary{cursor:pointer;color:var(--leaf);font-weight:600;padding:6px 0}
 </head>
 <body>
 <div id="app"><p class="empty">Loading fruits…</p></div>
+<div class="unsaved" id="unsaved-bar" hidden><strong>Unsaved changes</strong><button class="primary" data-act="saveFruits">Save prices</button></div>
 <div class="toast" id="toast" role="status"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
@@ -599,6 +607,15 @@ const S = {
   bookStep:1, bkMoreOpen:false,
   book:[], bookDate: ymd(ist()), bookShop:"1town", bookDraft:null
 };
+/* Prices tab: true while the owner has edits that are not saved yet. */
+const pricesDirty = () => !!(S.fruitsDirty && S.view === "owner" && S.ownerTab === "fruits" && S.editFruits);
+function syncBar(){ const b = document.getElementById("unsaved-bar"); if (b) b.hidden = !pricesDirty(); }
+function markDirty(){ S.fruitsDirty = true; syncBar(); }
+function onSaleCount(){ const on = S.editFruits.filter(f => f.active).length; return `${on} on sale, ${S.editFruits.length - on} hidden`; }
+function syncOnSale(card, f){
+  const l = card && card.querySelector("[data-hidlbl]"); if (l) l.hidden = !!f.active;
+  const c = document.getElementById("onsale-count"); if (c) c.textContent = onSaleCount();
+}
 const fruitById = id => S.fruits.find(f => f.id === id);
 /* Deleted fruits stay in the saved list (hidden) so old Daily book records and orders keep their name and numbers. */
 const fruitAny = id => fruitById(id) || (S.goneFruits || []).find(f => f.id === id);
@@ -1356,8 +1373,9 @@ function profitText(f){
   return `Break-even ${rupee(cost / size)}/${UNIT[f.unit].short}. Full ${t} at this price: ${p >= 0 ? rupee(p) + " profit" : rupee(-p) + " loss"}.`;
 }
 function ownerFruitsHtml(){
-  if (!S.editFruits){ S.editFruits = JSON.parse(JSON.stringify(S.fruits)); S.editGone = JSON.parse(JSON.stringify(S.goneFruits || [])); }
-  return `<p class="banner">Check every price before you share the app. Net weight is what the tray weighs. Sellable is what you can sell after wastage.</p>
+  if (!S.editFruits){ S.editFruits = JSON.parse(JSON.stringify(S.fruits)); S.editGone = JSON.parse(JSON.stringify(S.goneFruits || [])); S.fruitsDirty = false; }
+  return `<p class="onsale" id="onsale-count">${onSaleCount()}</p>
+  <p class="banner">Check every price before you share the app. Net weight is what the tray weighs. Sellable is what you can sell after wastage.</p>
   <div class="card allpct">
     <p class="lbl" style="margin:0 0 6px">For all fruits with automatic prices</p>
     <div class="fgrid">
@@ -1370,6 +1388,7 @@ function ownerFruitsHtml(){
     <li class="fedit" data-fid="${esc(f.id)}">
       <div class="fhead">${fruitIcon(f)}<strong>${esc(f.name)}</strong><button class="ghost" data-act="toggleEdit" data-id="${esc(f.id)}" aria-expanded="${S.editOpen === f.id}">${S.editOpen === f.id ? "Done" : "Edit"}</button>${f._new ? `<button class="ghost" data-act="removeNewFruit" data-id="${esc(f.id)}">Remove</button>` : ""}
         <label class="switch"><input type="checkbox" data-field="active" ${f.active ? "checked" : ""}> On sale</label></div>
+      <p class="hidlbl" data-hidlbl ${f.active ? "hidden" : ""}>Hidden from customers</p>
       <div class="fgrid">
         <label>${isSize(f) ? "Lot" : "Tray"} cost with transport<input class="in" type="number" min="0" inputmode="numeric" data-field="trayCost" value="${f.trayCost ? esc(f.trayCost) : ""}" placeholder="₹"></label>
         <label>${isSize(f) ? "Lot weight (kg)" : "Tray net weight"}<input class="in" type="number" min="0" step="0.5" inputmode="decimal" data-field="trayNet" value="${esc(f.trayNet || f.trayQty)}"></label>
@@ -1431,7 +1450,8 @@ function ownerFruitsHtml(){
     </div>
   </details>
   <p class="err" id="err" role="alert"></p>
-  <button class="primary wide" data-act="saveFruits">Save prices</button>`;
+  <button class="primary wide" data-act="saveFruits">Save prices</button>
+  <div style="height:72px" aria-hidden="true"></div>`;
 }
 
 function scrollAi(){ const l = document.getElementById("ai-log"); if (l) l.lastElementChild && l.lastElementChild.scrollIntoView({ block:"end" }); window.scrollTo(0, document.body.scrollHeight); }
@@ -1441,6 +1461,7 @@ function render(){
   document.getElementById("app").innerHTML = VIEWS[S.view]();
   if (S.view !== S.lastView){ window.scrollTo(0, 0); S.lastView = S.view; }
   if (S.view === "pay") drawQR();
+  syncBar();
 }
 function drawQR(){
   const el = document.getElementById("qr"); if (!el) return;
@@ -1609,7 +1630,7 @@ const ACTIONS = {
       sizes: unit === "size" ? [{ id:"s1", name:"Small", min:1, max:2 }, { id:"s2", name:"Medium", min:2, max:3 }, { id:"s3", name:"Large", min:3, max:4 }] : [],
       profitPct: PROFIT_PCT, storePct: STORE_PCT, auto: cost > 0, storePrice: Math.ceil(price * (1 + STORE_PCT / 100)) });
     applyAuto(S.editFruits[S.editFruits.length - 1]);
-    S.newPhoto = ""; S.addOpen = false;
+    S.newPhoto = ""; S.addOpen = false; S.fruitsDirty = true;
     render(); toast(unit === "size" ? `${name} added. Set its sizes, then press Save prices.` : `${name} added. Press Save prices to keep it.`);
     const card = document.querySelector(`[data-fid="${CSS.escape(id)}"]`); if (card) card.scrollIntoView({ block:"center" });
   },
@@ -1617,6 +1638,7 @@ const ACTIONS = {
     const p = Number(document.getElementById("all-profit").value), s = Number(document.getElementById("all-store").value);
     if (!(p >= 0) || !(s >= 0)) return toast("Enter both percentages.");
     let n = 0; S.editFruits.forEach(f => { if (f.auto){ f.profitPct = p; f.storePct = s; applyAuto(f); n++; } });
+    if (n) S.fruitsDirty = true;
     render(); toast(n ? `Updated ${n} ${n === 1 ? "fruit" : "fruits"}. Press Save prices to keep it.` : "No fruits use automatic prices yet.");
   },
   addSize(fid){
@@ -1624,12 +1646,12 @@ const ACTIONS = {
     let n = (f.sizes || []).length + 1; while ((f.sizes || []).some(s => s.id === "s" + n)) n++;
     const last = (f.sizes || [])[f.sizes.length - 1];
     f.sizes = [...(f.sizes || []), { id:"s" + n, name:"", min: last ? last.max : 1, max: last ? r1(last.max + 1) : 2 }];
-    render();
+    S.fruitsDirty = true; render();
   },
   removeSize(fid, idx){
     const f = S.editFruits.find(x => x.id === fid); if (!f) return;
     if (f.sizes.length <= 1) return toast("Keep at least one size.");
-    f.sizes.splice(Number(idx), 1); render();
+    f.sizes.splice(Number(idx), 1); S.fruitsDirty = true; render();
   },
   pickPhoto(key, src){
     const inp = document.querySelector(`input[data-photo="${CSS.escape(key)}"][data-src="${src}"]`);
@@ -1639,47 +1661,58 @@ const ACTIONS = {
     catch(e){ try { inp.click(); } catch(e2){ toast("This browser can't open photos. Open the app link in Chrome or Safari."); } }
   },
   toggleEdit(id){ S.editOpen = S.editOpen === id ? null : id; render(); },
-  setColor(id, color){ const f = S.editFruits.find(x => x.id === id); if (f){ f.color = color; render(); } },
+  setColor(id, color){ const f = S.editFruits.find(x => x.id === id); if (f){ f.color = color; S.fruitsDirty = true; render(); } },
   removePhoto(id){
     if (id === "__new"){ S.newPhoto = ""; S.addOpen = true; render(); return; }
-    const f = S.editFruits.find(x => x.id === id); if (f){ f.photo = ""; render(); toast("Photo removed. Press Save prices to keep this."); }
+    const f = S.editFruits.find(x => x.id === id); if (f){ f.photo = ""; S.fruitsDirty = true; render(); toast("Photo removed. Press Save prices to keep this."); }
   },
   deleteFruit(id){
     const f = S.editFruits.find(x => x.id === id); if (!f) return;
     if (!confirm(`Delete ${f.name}? Its past Daily book records stay, but it will disappear from the app.`)) return;
     S.editFruits = S.editFruits.filter(x => x.id !== id);
     if (!f._new){ const { _new, ...keep } = f; (S.editGone = S.editGone || []).push(keep); }
-    S.editOpen = null; render(); toast("Deleted. Press Save prices to keep this.");
+    S.editOpen = null; S.fruitsDirty = true; render(); toast("Deleted. Press Save prices to keep this.");
   },
-  removeNewFruit(id){ S.editFruits = S.editFruits.filter(f => !(f.id === id && f._new)); render(); },
+  removeNewFruit(id){ S.editFruits = S.editFruits.filter(f => !(f.id === id && f._new)); S.fruitsDirty = true; render(); },
   async saveFruits(_, __, btn){
+    const fail = m => { setErr(m); toast(m); return false; };
     const noName = S.editFruits.find(f => !String(f.name || "").trim());
-    if (noName) return setErr("Every fruit needs a name.");
+    if (noName) return fail("Every fruit needs a name.");
     const bad = S.editFruits.find(f => f.active && (!(f.price > 0) || !(f.trayQty > 0)));
     for (const f of S.editFruits.filter(x => x.active && isSize(x))){
-      if (!f.sizes || !f.sizes.length) return setErr(`${f.name} needs at least one size.`);
+      if (!f.sizes || !f.sizes.length) return fail(`${f.name} needs at least one size.`);
       const bs = f.sizes.find(s => !String(s.name).trim() || !(s.min > 0) || !(s.max >= s.min));
-      if (bs) return setErr(`${f.name}: check the sizes. Each needs a name, and "to kg" must be at least "from kg".`);
+      if (bs) return fail(`${f.name}: check the sizes. Each needs a name, and "to kg" must be at least "from kg".`);
     }
     const autoMissing = S.editFruits.find(f => f.active && f.auto && !autoPrices(f));
-    if (autoMissing) return setErr(`${autoMissing.name} needs a tray cost and sellable per tray for automatic prices.`);
-    if (bad) return setErr(`${bad.name} needs a price and a tray size, or turn it off.`);
-    btn.disabled = true;
+    if (autoMissing) return fail(`${autoMissing.name} needs a tray cost and sellable per tray for automatic prices.`);
+    if (bad) return fail(`${bad.name} needs a price and a tray size, or turn it off.`);
+    if (btn) btn.disabled = true;
     S.editFruits.forEach(f => { applyAuto(f); if (!(Number(f.storePrice) > 0)) f.storePrice = f.price; });
     const clean = S.editFruits.map(({ _new, ...f }) => f).concat((S.editGone || []).map(f => ({ ...f, deleted:true, active:false })));
-    try { setFruits(await api.saveFruits(S.ownerKey, clean)); S.editFruits = null; S.editGone = null; render(); toast("Prices saved"); }
-    catch(e){ btn.disabled = false; setErr(e.message || "Couldn't save prices."); }
+    try { setFruits(await api.saveFruits(S.ownerKey, clean)); S.editFruits = null; S.editGone = null; S.fruitsDirty = false; render(); toast("Prices saved"); return true; }
+    catch(e){ if (btn) btn.disabled = false; fail(e.message || "Couldn't save prices."); return false; }
   }
 };
+/* Leaving Prices with unsaved edits: ask first. Yes = save (same checks as Save prices) then continue; No = discard and continue. */
+const LEAVES_PRICES = new Set(["go", "refresh", "ownerLogout", "ownerTab"]);
+async function leavePrices(run){
+  if (confirm("You have unsaved changes in Prices. Save them now?")){
+    if (!(await ACTIONS.saveFruits(null, null, null))) return;
+  } else { S.editFruits = null; S.editGone = null; S.fruitsDirty = false; }
+  run();
+}
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
-  const fn = ACTIONS[b.dataset.act]; if (fn) fn(b.dataset.id, b.dataset.arg, b, e);
+  const fn = ACTIONS[b.dataset.act]; if (!fn) return;
+  if (LEAVES_PRICES.has(b.dataset.act) && pricesDirty()) return leavePrices(() => fn(b.dataset.id, b.dataset.arg, b, e));
+  fn(b.dataset.id, b.dataset.arg, b, e);
 });
 document.addEventListener("input", e => {
   const el = e.target, card = el.closest(".fedit"); if (!card || !el.dataset.field || !S.editFruits) return;
   const f = S.editFruits.find(x => x.id === card.dataset.fid); if (!f) return;
   f[el.dataset.field] = el.type === "checkbox" ? el.checked : el.dataset.text ? el.value : Number(el.value);
-  applyAuto(f);
+  applyAuto(f); markDirty(); syncOnSale(card, f);
   if (el.dataset.field === "auto"){ if (!f.auto && !f.storePrice) f.storePrice = Math.ceil(f.price * (1 + (f.storePct || STORE_PCT) / 100)); render(); return; }
   card.querySelector("[data-profit]").textContent = profitText(f);
   const ap = card.querySelector("[data-autoprice]"); if (ap) ap.innerHTML = autoPriceText(f);
@@ -1689,7 +1722,7 @@ document.addEventListener("input", e => {
   const el = e.target, k = el.dataset && el.dataset.size; if (!k || !S.editFruits) return;
   const [fid, idx, field] = k.split("|"), f = S.editFruits.find(x => x.id === fid); if (!f) return;
   const s = f.sizes[Number(idx)]; if (!s) return;
-  s[field] = field === "name" ? el.value : Number(el.value);
+  s[field] = field === "name" ? el.value : Number(el.value); markDirty();
   const out = document.querySelector(`[data-szp="${CSS.escape(fid + "|" + idx)}"]`); if (out) out.innerHTML = szPriceText(f, s);
 });
 document.addEventListener("input", e => {
@@ -1727,7 +1760,7 @@ document.addEventListener("change", e => {
     toast("Preparing photo…");
     photoFromFile(file).then(data => {
       if (key === "__new"){ S.newPhoto = data; S.addOpen = true; }
-      else { const f = S.editFruits && S.editFruits.find(x => x.id === key); if (f) f.photo = data; }
+      else { const f = S.editFruits && S.editFruits.find(x => x.id === key); if (f){ f.photo = data; S.fruitsDirty = true; } }
       render(); toast(key === "__new" ? "Photo ready" : "Photo added. Press Save prices to keep it.");
     }).catch(err => toast(err.message));
     return;
