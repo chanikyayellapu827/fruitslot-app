@@ -93,6 +93,8 @@ details summary{cursor:pointer;color:var(--leaf);font-weight:600;padding:6px 0}
 .order.picked{border-left-color:var(--line)}
 .order.rejected{border-left-color:var(--bad)}
 .order p,.tray p{margin:4px 0}
+.oamt{font-size:1.9rem;font-weight:700;margin:4px 0;color:var(--pom);line-height:1.1}
+button.big{font-size:1.15rem;min-height:58px}
 .ohead{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .chip{font-size:.85rem;padding:2px 10px;border-radius:999px;background:var(--bg);font-weight:600;white-space:nowrap}
 .order a{color:var(--leaf)}
@@ -429,6 +431,7 @@ function fmtQty(q, unit){
 function ist(){ return new Date(new Date().toLocaleString("en-US", { timeZone:"Asia/Kolkata" })); }
 function ymd(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
 function pickupDate(){ const n = ist(), d = new Date(n); d.setDate(d.getDate() + (n.getHours() >= CONFIG.CUTOFF_HOUR ? 2 : 1)); return ymd(d); }
+function placedAt(iso){ const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("en-IN", { timeZone:"Asia/Kolkata", day:"numeric", month:"short", hour:"numeric", minute:"2-digit", hour12:true }); }
 function niceDate(s){ if(!s) return ""; const [y,m,d] = String(s).slice(0,10).split("-").map(Number); return new Date(y, m-1, d).toLocaleDateString("en-IN", { weekday:"short", day:"numeric", month:"short" }); }
 function cutoffLabel(){ const h = CONFIG.CUTOFF_HOUR; return (h % 12 || 12) + (h < 12 ? " AM" : " PM"); }
 function timeLeft(){
@@ -546,7 +549,6 @@ const api = {
   async placeOrder(p){
     if (REMOTE()) return remotePost({ action:"order", ...p });
     const fruits = LS.get("fs_fruits", DEFAULT_FRUITS), orders = LS.get("fs_orders", []);
-    if (orders.some(o => o.utr === p.utr)) throw new Error("This UTR is already used for another order.");
     const items = p.items.map(i => {
       const f = fruits.map(normFruit).find(x => x.id === i.id && x.active);
       if (!f) throw new Error("A fruit in your order is no longer available. Go back and check your order.");
@@ -557,7 +559,7 @@ const api = {
       return { id:f.id, name:f.name, unit:f.unit, qty:i.qty, price:f.price };
     });
     const total = items.reduce((s, i) => s + i.qty * i.price, 0);
-    const o = { id:"FS" + (1001 + orders.length), created:new Date().toISOString(), name:p.name, phone:p.phone, shop:p.shop, pickupDate:pickupDate(), items, total, utr:p.utr, status:"pending" };
+    const o = { id:"FS" + (1001 + orders.length), created:new Date().toISOString(), name:p.name, phone:p.phone, shop:p.shop, pickupDate:pickupDate(), items, total, status:"pending" };
     orders.push(o); LS.set("fs_orders", orders);
     return { id:o.id, total:o.total, pickupDate:o.pickupDate, shop:o.shop, status:o.status };
   },
@@ -735,20 +737,18 @@ function viewPay(){
   <header class="top"><button class="link" data-act="go" data-id="checkout">Back</button><span class="title">Pay to book</span><span style="width:40px"></span></header>
   <section class="card">
     <p class="amount">${rupee(amt)}</p>
-    <p class="note">Your order is booked after you pay and enter the payment ID.</p>
     <ol class="steps">
       <li>Copy our UPI ID
         <div class="upi"><code>${esc(CONFIG.UPI_ID)}</code><button class="ghost" data-act="copyUpi">Copy</button></div></li>
       <li>Pay <strong>${rupee(amt)}</strong> in PhonePe, Google Pay or Paytm.</li>
-      <li>Enter the 12-digit UTR or transaction ID from the payment screen.
-        <input class="in" id="f-utr" inputmode="numeric" maxlength="12" placeholder="12-digit UTR" autocomplete="off"></li>
     </ol>
     <details><summary>Show QR code</summary>
       <div id="qr"></div>
       <p class="note">Someone else can scan this from their phone. On your own phone, take a screenshot and use "scan from gallery" in your UPI app.</p>
     </details>
     <p class="err" id="err" role="alert"></p>
-    <button class="primary wide" data-act="placeOrder">I've paid, book my order</button>
+    <button class="primary wide big" data-act="placeOrder">I've paid ${rupee(amt)}, book my order</button>
+    <p class="note">Pay from your UPI app first. We confirm your payment before pickup.</p>
   </section>`;
 }
 function viewDone(){
@@ -819,7 +819,8 @@ function ownerOrdersHtml(){
         <div class="ohead"><strong>${esc(o.id)}</strong><span class="chip">${STATUS_OWNER[o.status] || esc(o.status)}</span></div>
         <p>${esc(o.name)}, <a href="tel:${esc(o.phone)}">${esc(o.phone)}</a>, ${shopShort}</p>
         <p>${(o.items || []).map(i => `${esc(i.name)} ${fmtQty(Number(i.qty), i.unit)}`).join(", ")}</p>
-        <p><strong>${rupee(o.total)}</strong>, UTR <code>${esc(o.utr)}</code></p>
+        <p class="oamt">${rupee(o.total)}</p>
+        <p class="note">Placed ${esc(placedAt(o.created))}${o.utr ? `, UTR <code>${esc(o.utr)}</code>` : ""}</p>
         ${btns ? `<div class="actions">${btns}</div>` : ""}
       </li>`;
     }).join("")}</ul>`;
@@ -1505,16 +1506,15 @@ const ACTIONS = {
     catch(e){ toast("Copy didn't work. Type the UPI ID: " + CONFIG.UPI_ID); }
   },
   async placeOrder(_, __, btn){
-    const utr = document.getElementById("f-utr").value.replace(/\D/g, "");
-    if (!/^\d{12}$/.test(utr)) return setErr("Enter the 12-digit UTR from your payment screen.");
+    const label = btn.textContent;
     btn.disabled = true; btn.textContent = "Booking…";
     try {
-      const res = await api.placeOrder({ ...S.customer, items: cartLines().map(l => l.size ? { id:l.id, size:l.size, qty:l.qty } : { id:l.id, qty:l.qty }), utr });
+      const res = await api.placeOrder({ ...S.customer, items: cartLines().map(l => l.size ? { id:l.id, size:l.size, qty:l.qty } : { id:l.id, qty:l.qty }) });
       S.myOrders = [res.id, ...S.myOrders.filter(x => x !== res.id)].slice(0, 20); LS.set("fs_my", S.myOrders);
       S.lastOrder = res; S.cart = {}; S.view = "done"; render();
     } catch(e){
       setErr(e.message || "Couldn't book the order. Check your internet and try again.");
-      btn.disabled = false; btn.textContent = "I've paid, book my order";
+      btn.disabled = false; btn.textContent = label;
     }
   },
   async ownerLogin(keyArg){

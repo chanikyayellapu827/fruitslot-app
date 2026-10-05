@@ -101,7 +101,7 @@ function dateStr_(v){
 function readOrders_(){
   return rows_("Orders", ORDER_COLS).slice(-1000).map(o => ({
     id:String(o.id), created:String(o.created), name:String(o.name), phone:String(o.phone), shop:String(o.shop),
-    pickupDate: dateStr_(o.pickupDate), items: JSON.parse(o.items || "[]"), total:Number(o.total), utr:String(o.utr), status:String(o.status)
+    pickupDate: dateStr_(o.pickupDate), items: JSON.parse(o.items || "[]"), total:Number(o.total), utr:String(o.utr || ""), status:String(o.status)
   }));
 }
 function pickupDate_(){
@@ -113,11 +113,9 @@ function pickupDate_(){
 function placeOrder_(p){
   const name = String(p.name || "").trim().slice(0, 60);
   const phone = String(p.phone || "").replace(/\D/g, "");
-  const utr = String(p.utr || "").replace(/\D/g, "");
   if (!name) throw new Error("Enter your name.");
   if (!/^[6-9]\d{9}$/.test(phone)) throw new Error("Enter a 10-digit mobile number.");
   if (SHOPS.indexOf(p.shop) < 0) throw new Error("Choose a shop to pick up from.");
-  if (!/^\d{12}$/.test(utr)) throw new Error("Enter the 12-digit UTR from your payment screen.");
   if (!Array.isArray(p.items) || !p.items.length || p.items.length > 20) throw new Error("Your order is empty.");
 
   const fruits = readFruits_();
@@ -141,10 +139,9 @@ function placeOrder_(p){
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
     const sh = sheet_("Orders");
-    if (rows_("Orders", ORDER_COLS).some(o => String(o.utr) === utr)) throw new Error("This UTR is already used for another order.");
     const id = "FS" + (1000 + sh.getLastRow());
     const pickup = pickupDate_();
-    sh.appendRow([id, new Date().toISOString(), name, phone, p.shop, pickup, JSON.stringify(items), total, utr, "pending"]);
+    sh.appendRow([id, new Date().toISOString(), name, phone, p.shop, pickup, JSON.stringify(items), total, "", "pending"]);
     return { id:id, total:total, pickupDate:pickup, shop:p.shop, status:"pending" };
   } finally { lock.releaseLock(); }
 }
