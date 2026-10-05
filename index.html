@@ -858,6 +858,7 @@ const num = v => Number(v) || 0;
 const blank = v => v === null || v === undefined || v === "";
 const unitShort = f => f.unit === "kg" || f.unit === "size" ? "kg" : f.unit === "piece" ? "pcs" : "box";
 const netOf = f => Number(f.trayNet) || Number(f.trayQty) || 1;
+const sellOf = f => Number(f.trayQty) > 0 ? Number(f.trayQty) : netOf(f);   // cost per kg divides by sellable; falls back to net weight
 const bookRow = (shop, date) => S.book.find(r => r.shop === shop && r.date === date);
 function prevClose(shop, date, fid){
   const rows = S.book.filter(r => r.shop === shop && r.date < date && r.fruits && r.fruits[fid]).sort((a, b) => a.date < b.date ? 1 : -1);
@@ -891,12 +892,12 @@ function calcShop(d){
     if (blank(x.open)) out.noOpen.push(f.name);
     if (blank(x.close)){ out.uncounted.push(f.name); out.lines.push({ f, avail, counted:false }); return; }
     const close = num(x.close), waste = num(x.waste), sold = r1(avail - close - waste);
-    const cpu = tc > 0 ? tc / net : 0;
+    const sell = sellOf(f), cpu = tc > 0 ? tc / sell : 0;
     if (!(tc > 0) && (sold > 0 || waste > 0)) out.missingCost.push(f.name);
     if (sold < 0) out.negative.push(f.name);
     const lineCost = Math.round(Math.max(sold, 0) * cpu), lineWaste = Math.round(waste * cpu);   // round each line so totals add up exactly
     out.cost += lineCost; out.wasteCost += lineWaste;
-    out.lines.push({ f, avail, counted:true, sold, waste, cpu, tc, lineCost, lineWaste, open:num(x.open), trays, net, close, wastePct: avail ? Math.round(waste / avail * 100) : 0 });
+    out.lines.push({ f, avail, counted:true, sold, waste, cpu, tc, lineCost, lineWaste, open:num(x.open), trays, net, sell, close, wastePct: avail ? Math.round(waste / avail * 100) : 0 });
   });
   out.spent = Math.round(out.spent);
   out.cash = Math.round(num(d.cash)); out.upi = Math.round(num(d.upi)); out.exp = Math.round(num(d.expenses)); out.app = Math.round(appSales(d.shop, d.date));
@@ -998,7 +999,7 @@ function ownerBookHtml(){
           <p class="bk-calc-h"><strong>${esc(l.f.name)}</strong><b>${rupee(l.lineCost + l.lineWaste)}</b></p>
           <p>Had: ${r1(l.open)} ${u} from last night${l.trays ? ` + ${r1(l.trays)} ${word}${l.trays === 1 ? "" : "s"} × ${r1(l.net)} ${u} = <b>${r1(l.avail)} ${u}</b>` : ` = <b>${r1(l.avail)} ${u}</b>`}</p>
           <p>Sold: ${r1(l.avail)} − ${r1(l.close)} left${l.waste ? ` − ${r1(l.waste)} thrown` : ""} = <b>${fmtQty(Math.max(l.sold, 0), l.f.unit)}</b></p>
-          <p>Cost per ${u}: ${l.tc ? rupee(l.tc) : "₹0"} per ${word} ÷ ${r1(l.net)} ${u} = <b>${rupee2(l.cpu)}</b>${l.tc ? "" : ` <span class="bad">(add the ${word} cost on the Morning step)</span>`}</p>
+          <p>Cost per ${u}: ${l.tc ? rupee(l.tc) : "₹0"} per ${word} ÷ ${r1(l.sell)} ${u} sellable = <b>${rupee2(l.cpu)}</b>${l.tc ? "" : ` <span class="bad">(add the ${word} cost on the Morning step)</span>`}</p>
           <p>Sold cost: ${r1(Math.max(l.sold, 0))} × ${rupee2(l.cpu)} = <b>${rupee(l.lineCost)}</b>${l.waste ? `<br>Thrown cost: ${r1(l.waste)} × ${rupee2(l.cpu)} = <b class="bad">${rupee(l.lineWaste)}</b> (${l.wastePct}% wasted)` : ""}</p>
         </div>`; }).join("")}</div>` : ""}
       ${warn.map(([n, w]) => `<button class="bk-warn" data-act="bkStep" data-id="${n}">${esc(w)} <u>Fix</u></button>`).join("")}`;
