@@ -382,8 +382,8 @@ const PROFIT_PCT = 10, STORE_PCT = 10;   // starting values; change them on the 
 function autoPrices(f){
   const cost = Number(f.trayCost), sell = Number(f.trayQty);
   if (!(cost > 0 && sell > 0)) return null;
-  const online = Math.ceil(cost * (1 + (Number(f.profitPct) || 0) / 100) / sell);
-  return { online, store: Math.ceil(online * (1 + (Number(f.storePct) || 0) / 100)) };
+  const online = Math.ceil(Math.round(cost * (1 + (Number(f.profitPct) || 0) / 100) / sell * 100) / 100);
+  return { online, store: Math.ceil(Math.round(online * (1 + (Number(f.storePct) || 0) / 100) * 100) / 100) };
 }
 function applyAuto(f){
   if (!f.auto) return f;
@@ -393,7 +393,7 @@ function applyAuto(f){
 const isSize = f => f.unit === "size";
 const midKg = s => (Number(s.min) + Number(s.max)) / 2;
 const kgRange = s => `${r1(Number(s.min))}–${r1(Number(s.max))} kg`;
-const sizePrice = (f, s, shop) => Math.ceil((shop ? Number(f.storePrice) : Number(f.price)) * midKg(s));
+const sizePrice = (f, s, shop) => Math.ceil(Math.round((shop ? Number(f.storePrice) : Number(f.price)) * midKg(s) * 100) / 100);
 function parseSizes(v){
   let a = v; if (typeof a === "string"){ try { a = JSON.parse(a || "[]"); } catch(e){ a = []; } }
   return Array.isArray(a) ? a.map(s => ({ id:String(s.id), name:String(s.name || ""), min:Number(s.min) || 0, max:Number(s.max) || 0 })) : [];

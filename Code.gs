@@ -130,7 +130,7 @@ function placeOrder_(p){
       if (qty !== Math.round(qty)) throw new Error("Check the quantity for " + f.name + ".");
       const mid = (s.min + s.max) / 2;
       return { id:f.id, size:s.id, name:f.name + " " + s.name + " (" + s.min + "–" + s.max + " kg)", unit:"piece", qty:qty,
-               price: Math.ceil(f.price * mid), kg: Math.round(mid * qty * 10) / 10 };
+               price: Math.ceil(Math.round(f.price * mid * 100) / 100), kg: Math.round(mid * qty * 10) / 10 };
     }
     return { id:f.id, name:f.name, unit:f.unit, qty:qty, price:f.price };   // price always comes from the sheet
   });
@@ -167,8 +167,8 @@ function saveFruits_(list){
   });
   list.forEach(f => {   // recompute automatic prices on the server too
     if (f.auto && Number(f.trayCost) > 0 && Number(f.trayQty) > 0){
-      f.price = Math.ceil(Number(f.trayCost) * (1 + (Number(f.profitPct) || 0) / 100) / Number(f.trayQty));
-      f.storePrice = Math.ceil(f.price * (1 + (Number(f.storePct) || 0) / 100));
+      f.price = Math.ceil(Math.round(Number(f.trayCost) * (1 + (Number(f.profitPct) || 0) / 100) / Number(f.trayQty) * 100) / 100);
+      f.storePrice = Math.ceil(Math.round(f.price * (1 + (Number(f.storePct) || 0) / 100) * 100) / 100);
     }
   });
   const rows = list.map(f => [String(f.id), String(f.name), String(f.te || ""), String(f.unit), Number(f.price) || 0, Number(f.step) || 1,
