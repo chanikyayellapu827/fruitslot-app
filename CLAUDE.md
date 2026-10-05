@@ -27,7 +27,7 @@ FruitSlot is a fruit pre-order and shop management PWA for two shops in Eluru: *
 
 - App price = tray cost x 1.10 / sellable per tray, rounded up.
 - Shop price = app price + 10%.
-- Daily book cost per kg uses the tray net weight.
+- Daily book cost per kg uses tray cost ÷ sellable per tray.
 
 ## Rules
 
