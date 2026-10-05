@@ -1035,6 +1035,16 @@ function aiTools(){
     { name:"update_fruit", description:"Change a fruit's price settings or switch it on/off for sale. With automatic pricing, app and shop prices come from tray cost, sellable amount and percentages.",
       input_schema:{ type:"object", properties:{ fruit_id:fruit, tray_cost:{ type:"number" }, tray_net:{ type:"number" }, sellable:{ type:"number" }, profit_pct:{ type:"number" }, shop_pct:{ type:"number" },
         on_sale:{ type:"boolean" }, app_price:{ type:"number", description:"Only for manual pricing; switches automatic pricing off" }, shop_price:{ type:"number", description:"Only for manual pricing" } }, required:["fruit_id"] } },
+    { name:"add_fruit", description:"Add a new fruit to the shop with automatic pricing (app and shop price come from tray cost, sellable per tray and the usual percentages). Ask for anything missing: tray cost, tray net weight and sellable per tray are all needed.",
+      input_schema:{ type:"object", properties:{ name:{ type:"string", description:"English name" }, telugu_name:{ type:"string" }, unit:{ type:"string", enum:["kg","piece","box","size"] },
+        tray_cost:{ type:"number", description:"Cost per tray including transport" }, tray_net:{ type:"number", description:"Tray net weight (kg, pieces or boxes)" }, sellable:{ type:"number", description:"Sellable per tray, not more than tray net" },
+        on_sale:{ type:"boolean", description:"Default true" } }, required:["name","unit","tray_cost","tray_net","sellable"] } },
+    { name:"delete_fruit", description:"Delete a fruit from the app (same as the Delete fruit button). Its past Daily book records stay.",
+      input_schema:{ type:"object", properties:{ fruit_id:fruit }, required:["fruit_id"] } },
+    { name:"rename_fruit", description:"Change a fruit's English name and/or Telugu name. Give at least one.",
+      input_schema:{ type:"object", properties:{ fruit_id:fruit, name:{ type:"string" }, telugu_name:{ type:"string" } }, required:["fruit_id"] } },
+    { name:"clear_fruit_entry", description:"Clear everything recorded in the Daily book for one fruit at one shop on one day (opening stock, trays bought, night count, thrown). Use it to remove a wrong entry.",
+      input_schema:{ type:"object", properties:{ shop, date, fruit_id:fruit }, required:["shop","date","fruit_id"] } },
     { name:"update_order_status", description:"Change an app order's status: paid (payment received), rejected (payment not found), picked (customer collected), pending.",
       input_schema:{ type:"object", properties:{ order_id:{ type:"string" }, status:{ type:"string", enum:["pending","paid","picked","rejected"] } }, required:["order_id","status"] } }
   ];
@@ -1049,7 +1059,7 @@ function aiContext(){
     const c = calcShop(r), fr = {};
     Object.keys(r.fruits || {}).forEach(id => { const x = r.fruits[id], f = fruitAny(id); if (!f) return;
       const l = c.lines.find(z => z.f.id === id);
-      fr[id] = { open:x.open, trays:x.trays || 0, tray_cost:x.trayCost, left:x.close, thrown:x.waste, sold: l && l.counted ? l.sold : undefined }; });
+      fr[id] = { open:x.open, trays:x.trays || 0, tray_cost:x.trayCost, left:x.close, thrown:x.waste, sold: l && l.counted ? l.sold : undefined, cost_per_kg: l && l.counted && l.cpu ? Math.round(l.cpu * 100) / 100 : undefined }; });
     days.push({ date:ds, shop:s.id, profit:c.profit, sales:c.revenue, cash:c.cash, counter_upi:c.upi, app:c.app, fruit_cost:c.cost, waste_cost:c.wasteCost, other_costs:c.exp, complete:c.complete, fruits:fr });
   }));
   const p30 = periodStats(dayList(today, 30));
@@ -1066,6 +1076,8 @@ You help the owner keep the Daily book, prices and app orders up to date, and yo
 
 Rules:
 - To change anything, call the tools. Each change is shown to the owner as a card and is only saved after they tap Confirm. Never say something is saved; say "Check and confirm below."
+- Tools: set_morning_purchase, set_opening_stock, set_night_count, set_money (Daily book); clear_fruit_entry (remove a wrong Daily book entry for one fruit, shop and day); update_fruit (prices, on/off sale); add_fruit (new fruit, automatic pricing; needs name, unit, tray cost, tray net weight and sellable per tray, so ask if any is missing); rename_fruit (English and/or Telugu name); delete_fruit (removes the fruit from the app, past Daily book records stay); update_order_status.
+- Daily book cost per kg = tray cost (with transport) ÷ sellable per tray (tray net weight only if sellable is empty). DATA shows it as cost_per_kg.
 - If the shop is not clear, ask which shop before calling tools. If the day is not said, use today. "Yesterday" means the day before today.
 - Use fruit ids from DATA.fruits. Amounts: unit "kg" and "size" fruits in kg, "piece" in pieces, "box" in boxes. Trays means trays or lots bought; tray cost includes transport.
 - Never invent numbers. Answer only from DATA. If DATA doesn't have it, say so and say what to enter.
@@ -1098,19 +1110,42 @@ const fName = id => (fruitById(id) || {}).name || id;
 const shopShort = id => (shopName(id) || id).replace(" Rythu Bazar", "");
 function aiValidate(t){
   const a = t.input || {}, okNum = v => v === undefined || v === null || (typeof v === "number" && isFinite(v) && v >= 0);
-  if (["set_morning_purchase","set_opening_stock","set_night_count","set_money"].includes(t.name)){
+  if (["set_morning_purchase","set_opening_stock","set_night_count","set_money","clear_fruit_entry"].includes(t.name)){
     if (!SHOP_IDS().includes(a.shop)) return "Unknown shop.";
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(a.date))) return "Unclear day.";
     if (a.date > ymd(ist())) return "That day is in the future.";
   }
-  if (["set_morning_purchase","set_opening_stock","set_night_count","update_fruit"].includes(t.name) && !fruitById(a.fruit_id)) return `Unknown fruit "${a.fruit_id}".`;
+  if (["set_morning_purchase","set_opening_stock","set_night_count","update_fruit","delete_fruit","rename_fruit","clear_fruit_entry"].includes(t.name) && !fruitById(a.fruit_id)) return `Unknown fruit "${a.fruit_id}".`;
   for (const k of ["trays","tray_cost","amount","left","thrown","cash","counter_upi","other_costs","tray_net","sellable","profit_pct","shop_pct","app_price","shop_price"]) if (!okNum(a[k])) return `Check the number for ${k.replace("_", " ")}.`;
   if (t.name === "set_morning_purchase" && a.trays > 60) return "That's a lot of trays. Please check.";
   if (t.name === "update_order_status"){
     if (!S.ownerOrders.find(o => o.id === a.order_id)) return `Order ${a.order_id} not found.`;
     if (!["pending","paid","picked","rejected"].includes(a.status)) return "Unknown status.";
   }
-  if (!["set_morning_purchase","set_opening_stock","set_night_count","set_money","update_fruit","update_order_status"].includes(t.name)) return "Unknown action.";
+  if (t.name === "add_fruit"){
+    const name = String(a.name || "").trim();
+    if (!name) return "Enter the fruit name.";
+    if (name.length > 40 || String(a.telugu_name || "").length > 40) return "That name is too long.";
+    if (allFruits().some(f => f.name.toLowerCase() === name.toLowerCase())) return `${name} is already in the list.`;
+    if (!["kg","piece","box","size"].includes(a.unit)) return "Unit must be kg, piece, box or size.";
+    if (!(a.tray_cost > 0)) return "Enter the tray cost.";
+    if (!(a.tray_net > 0)) return "Enter the tray net weight.";
+    if (!(a.sellable > 0)) return "Enter the sellable amount per tray.";
+    if (a.sellable > a.tray_net) return "Sellable can't be more than the tray net weight.";
+    if (a.on_sale !== undefined && typeof a.on_sale !== "boolean") return "Check on sale.";
+  }
+  if (t.name === "rename_fruit"){
+    const name = a.name === undefined ? undefined : String(a.name).trim(), te = a.telugu_name === undefined ? undefined : String(a.telugu_name).trim();
+    if (name === undefined && te === undefined) return "Give a new name.";
+    if (name !== undefined && !name) return "Enter the fruit name.";
+    if ((name || "").length > 40 || (te || "").length > 40) return "That name is too long.";
+    if (name !== undefined && S.fruits.concat(S.goneFruits || []).some(f => f.id !== a.fruit_id && f.name.toLowerCase() === name.toLowerCase())) return `${name} is already in the list.`;
+  }
+  if (t.name === "clear_fruit_entry"){
+    const r = bookRow(a.shop, a.date);
+    if (!r || !r.fruits || !r.fruits[a.fruit_id]) return `Nothing saved for ${fName(a.fruit_id)} on that day.`;
+  }
+  if (!["set_morning_purchase","set_opening_stock","set_night_count","set_money","update_fruit","update_order_status","add_fruit","delete_fruit","rename_fruit","clear_fruit_entry"].includes(t.name)) return "Unknown action.";
   return null;
 }
 function aiDescribe(t){
@@ -1128,6 +1163,17 @@ function aiDescribe(t){
       if (f){ const g = aiFruitPatch(JSON.parse(JSON.stringify(f)), a); after = ` → app <b>${rupee(g.price)}</b>, shop <b>${rupee(g.storePrice)}</b>`; }
       return `<b>${esc(fName(a.fruit_id))}</b>: ${ch.join(", ") || "no change"}${after}`;
     }
+    case "add_fruit": {
+      const g = aiNewFruit(a), un = a.unit === "size" ? "kg, sold by size" : a.unit === "piece" ? "pieces" : a.unit === "box" ? "boxes" : "kg";
+      return `Add new fruit <b>${esc(String(a.name || "").trim())}</b>${a.telugu_name ? ` (${esc(String(a.telugu_name).trim())})` : ""}, ${esc(un)}: tray cost <b>${rupee(a.tray_cost)}</b>, tray net <b>${r1(a.tray_net)}</b>, sellable <b>${r1(a.sellable)}</b> per tray, <b>${g.active ? "on sale" : "off sale"}</b> → app <b>${rupee(g.price)}</b>, shop <b>${rupee(g.storePrice)}</b>${a.unit === "size" ? ". Set its sizes on the Prices tab" : ""}`;
+    }
+    case "delete_fruit": return `<b>Delete ${esc(fName(a.fruit_id))}</b> from the app. Past Daily book records stay`;
+    case "rename_fruit": {
+      const ch = []; if (a.name !== undefined) ch.push(`name <b>${esc(fName(a.fruit_id))}</b> → <b>${esc(String(a.name).trim())}</b>`);
+      if (a.telugu_name !== undefined) ch.push(`Telugu name <b>${esc((f && f.te) || "none")}</b> → <b>${esc(String(a.telugu_name).trim() || "none")}</b>`);
+      return `Rename: ${ch.join(", ")}`;
+    }
+    case "clear_fruit_entry": return `${where}: <b class="bad">clear</b> everything recorded for <b>${esc(fName(a.fruit_id))}</b> in the Daily book`;
     case "update_order_status": { const o = S.ownerOrders.find(x => x.id === a.order_id) || {}; return `Order <b>${esc(a.order_id)}</b>${o.name ? ` (${esc(o.name)}, ${rupee(o.total)})` : ""}: mark <b>${esc(STATUS_OWNER[a.status] || a.status)}</b>`; }
   }
   return esc(t.name);
@@ -1144,6 +1190,14 @@ function aiFruitPatch(f, a){
   if ((a.tray_cost != null || a.sellable != null || a.profit_pct != null || a.shop_pct != null) && a.app_price == null && a.shop_price == null && f.trayCost > 0) f.auto = true;
   applyAuto(f); if (!(f.storePrice > 0)) f.storePrice = f.price;
   return f;
+}
+function aiNewFruit(a){
+  const name = String(a.name || "").trim(), used = allFruits();
+  let id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30) || "fruit";
+  const baseId = id; let n = 2; while (used.some(f => f.id === id)) id = baseId + "-" + n++;
+  return applyAuto({ id, name, te:String(a.telugu_name || "").trim(), unit:a.unit, price:0, step: a.unit === "kg" ? 0.5 : 1, trayQty:a.sellable, trayNet:a.tray_net, trayCost:a.tray_cost,
+    color:PALETTE[used.length % PALETTE.length], active: a.on_sale !== false, boxSize:"", photo:"", profitPct:PROFIT_PCT, storePct:STORE_PCT, auto:true, storePrice:0,
+    sizes: a.unit === "size" ? [{ id:"s1", name:"Small", min:1, max:2 }, { id:"s2", name:"Medium", min:2, max:3 }, { id:"s3", name:"Large", min:3, max:4 }] : [] });
 }
 async function aiBookPatch(shop, date, fn){
   const d = makeDraft(shop, date);
@@ -1167,6 +1221,21 @@ async function aiApply(t){
       const list = JSON.parse(JSON.stringify(S.fruits)); const f = list.find(x => x.id === a.fruit_id); aiFruitPatch(f, a);
       setFruits(await api.saveFruits(S.ownerKey, list.concat(S.goneFruits))); S.editFruits = null; return;
     }
+    case "add_fruit": {
+      const list = JSON.parse(JSON.stringify(S.fruits)); list.push(aiNewFruit(a));
+      setFruits(await api.saveFruits(S.ownerKey, list.concat(S.goneFruits))); S.editFruits = null; return;
+    }
+    case "delete_fruit": {
+      const list = JSON.parse(JSON.stringify(S.fruits)), f = list.find(x => x.id === a.fruit_id);
+      setFruits(await api.saveFruits(S.ownerKey, list.filter(x => x !== f).concat(S.goneFruits, [{ ...f, deleted:true, active:false }]))); S.editFruits = null; return;
+    }
+    case "rename_fruit": {
+      const list = JSON.parse(JSON.stringify(S.fruits)), f = list.find(x => x.id === a.fruit_id);
+      if (a.name !== undefined) f.name = String(a.name).trim();
+      if (a.telugu_name !== undefined) f.te = String(a.telugu_name).trim();
+      setFruits(await api.saveFruits(S.ownerKey, list.concat(S.goneFruits))); S.editFruits = null; return;
+    }
+    case "clear_fruit_entry": return aiBookPatch(a.shop, a.date, d => { delete d.fruits[a.fruit_id]; });
     case "update_order_status": { await api.updateOrder(S.ownerKey, a.order_id, a.status); const o = S.ownerOrders.find(x => x.id === a.order_id); if (o) o.status = a.status; return; }
   }
 }
