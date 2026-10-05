@@ -1096,12 +1096,40 @@ Rules:
 DATA (JSON):
 ${JSON.stringify(aiContext())}`;
 }
+/* Build the message list for the API. The API is strict: every tool_use must get exactly one tool_result in the very next user message,
+   and a tool_result may only answer a tool_use in the message right before it. So rebuild that pairing here instead of trusting saved state. */
+const AI_NOT_CONFIRMED = "Not confirmed by the owner. Nothing was saved.";
 function aiHistoryForApi(){
-  const msgs = S.ai.filter(m => !m.local).map(m => ({ role:m.role, content:m.content }));
-  let start = Math.max(0, msgs.length - 20);
-  while (start < msgs.length && !(msgs[start].role === "user" && !(Array.isArray(msgs[start].content) && msgs[start].content.some(b => b.type === "tool_result")))) start++;
-  return msgs.slice(start);
+  const asBlocks = c => Array.isArray(c) ? c : [{ type:"text", text:String(c || "") }];
+  const out = []; let pending = [], results = [];
+  const answer = id => results.find(r => r.tool_use_id === id) || { type:"tool_result", tool_use_id:id, content:AI_NOT_CONFIRMED, is_error:true };
+  const close = () => { if (pending.length) out.push({ role:"user", content:pending.map(answer) }); pending = []; results = []; };
+  S.ai.filter(m => !m.local).forEach(m => {
+    const blocks = asBlocks(m.content);
+    if (m.role === "assistant"){
+      close();
+      const keep = blocks.filter(b => (b.type === "text" && String(b.text || "").trim()) || b.type === "tool_use");
+      if (!keep.length) return;
+      out.push({ role:"assistant", content:keep });
+      pending = keep.filter(b => b.type === "tool_use").map(b => b.id);
+    } else {
+      results = blocks.filter(b => b.type === "tool_result" && pending.includes(b.tool_use_id));   // answers to anything else are dropped
+      const lead = pending.map(answer), text = blocks.filter(b => b.type === "text" && String(b.text || "").trim());
+      pending = []; results = [];
+      if (lead.length || text.length) out.push({ role:"user", content:[...lead, ...text] });
+    }
+  });
+  close();
+  // keep the last 20 messages. Start on a user message and drop its tool_results (their tool_use is cut off), so no pair is split
+  for (let start = Math.max(0, out.length - 20); start < out.length; start++){
+    if (out[start].role !== "user") continue;
+    const text = out[start].content.filter(b => b.type === "text");
+    if (text.length) return [{ role:"user", content:text }, ...out.slice(start + 1)];
+  }
+  return [];
 }
+const aiLatestCard = () => { for (let i = S.ai.length - 1; i >= 0; i--){ const m = S.ai[i]; if (m.role === "assistant" && Array.isArray(m.content) && m.content.some(b => b.type === "tool_use")) return i; } return -1; };
+const AI_HISTORY_ERROR = /tool_use|tool_result|messages\.\d+|roles must alternate|first message must|unexpected .*id/i;
 async function aiCall(){
   const body = { system:aiSystem(), messages:aiHistoryForApi(), tools:aiTools() };
   if (REMOTE()) return remotePost({ action:"ai", key:S.ownerKey, ...body });
@@ -1262,10 +1290,11 @@ function ownerAiHtml(){
     const blocks = Array.isArray(m.content) ? m.content : [{ type:"text", text:String(m.content) }];
     const text = blocks.filter(b => b.type === "text").map(b => b.text).join("\n").trim();
     const tools = blocks.filter(b => b.type === "tool_use");
-    const pending = tools.filter(t => (S.aiAct[t.id] || {}).s === "pending" || !S.aiAct[t.id]);
+    const latest = i === aiLatestCard();
+    const pending = latest ? tools.filter(t => (S.aiAct[t.id] || {}).s === "pending" || !S.aiAct[t.id]) : [];   // older cards show status only
     const card = tools.length ? `<div class="ai-card">
         <p class="ai-card-h">${pending.length ? "Check and confirm" : "Changes"}</p>
-        <ul>${tools.map(t => { const st = S.aiAct[t.id] || { s:"pending" }, bad = aiSafe(aiValidate, t, "Couldn't check this change.");
+        <ul>${tools.map(t => { const st0 = S.aiAct[t.id] || { s:"pending" }, st = st0.s === "pending" && !latest ? { s:"cancelled" } : st0, bad = aiSafe(aiValidate, t, "Couldn't check this change.");
           return `<li class="${st.s}"><span class="ai-st">${st.s === "applied" ? "✓" : st.s === "cancelled" ? "–" : st.s === "error" || bad ? "!" : "•"}</span><span>${aiSafe(aiDescribe, t, esc(t.name))}${bad && st.s === "pending" ? `<br><em class="bad">${esc(bad)} This one will be skipped.</em>` : ""}${st.s === "error" ? `<br><em class="bad">${esc(st.msg || "Failed")}</em>` : ""}</span></li>`; }).join("")}</ul>
         ${pending.length ? `<div class="actions"><button class="yes" data-act="aiConfirm" data-id="${i}">Confirm</button><button data-act="aiCancel" data-id="${i}">Cancel</button></div>` : ""}
       </div>` : "";
@@ -1611,7 +1640,7 @@ const ACTIONS = {
   aiChip(_, text){ S.aiDraft = text; render(); const t = document.getElementById("ai-in"); if (t){ t.focus(); t.setSelectionRange(t.value.length, t.value.length); } },
   aiReset(){ S.ai = []; S.aiAct = {}; S.aiQueue = []; S.aiDraft = ""; aiSave(); render(); },
   async aiConfirm(i, _, btn){
-    const m = S.ai[Number(i)]; if (!m) return; btn.disabled = true;
+    const m = S.ai[Number(i)]; if (!m || Number(i) !== aiLatestCard()) return; btn.disabled = true;
     const tools = (m.content || []).filter(b => b.type === "tool_use");
     let ok = 0;
     for (const t of tools){
@@ -1624,7 +1653,7 @@ const ACTIONS = {
     aiSave(); render(); scrollAi(); if (ok) toast(`Saved ${ok} ${ok === 1 ? "change" : "changes"}`);
   },
   aiCancel(i){
-    const m = S.ai[Number(i)]; if (!m) return;
+    const m = S.ai[Number(i)]; if (!m || Number(i) !== aiLatestCard()) return;
     (m.content || []).filter(b => b.type === "tool_use").forEach(t => { if (!S.aiAct[t.id] || S.aiAct[t.id].s === "pending"){ S.aiAct[t.id] = { s:"cancelled" }; S.aiQueue.push({ type:"tool_result", tool_use_id:t.id, content:"The owner cancelled this. Nothing was saved." }); } });
     aiSave(); render(); scrollAi();
   },
@@ -1642,6 +1671,9 @@ const ACTIONS = {
       S.ai.push({ role:"assistant", content:res.content });
       (res.content || []).filter(b => b.type === "tool_use").forEach(t => { S.aiAct[t.id] = { s:"pending" }; });
     } catch(e){
+      if (AI_HISTORY_ERROR.test(String(e && e.message))){   // the saved chat is out of step with what the API accepts: start fresh, keep the typed message
+        S.ai = []; S.aiAct = {}; S.aiQueue = []; S.aiDraft = text; S.aiBusy = false; aiSave(); render(); setErr("Chat reset after an error. Your saved data is safe."); return;
+      }
       S.ai.pop(); S.aiQueue = queued; S.aiDraft = text; S.aiBusy = false; aiSave(); render(); setErr(e.message || "The assistant didn't answer. Try again."); return;
     }
     S.aiBusy = false; aiSave(); render(); scrollAi();
