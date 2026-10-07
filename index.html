@@ -385,14 +385,22 @@ const UNIT = {
   size:  { short:"kg",    label:"per kg" }
 };
 const unitLabel = f => f.unit === "size" ? "per kg, sold by size" : f.unit === "box" ? (f.boxSize ? `per ${f.boxSize} box` : "per box") : UNIT[f.unit].label;
-const PROFIT_PCT = 10, STORE_PCT = 10;   // starting values; change them on the Prices tab
+const PROFIT_PCT = 8, STORE_PCT = 10, WASTE_PCT = 8;   // starting values; change them on the Prices tab
+const r2 = n => Math.round(n * 100) / 100;
+/* Sellable = net x (1 - wastage%). Cost per kg = tray cost with transport / sellable.
+   App price = cost per kg x (1 + profit%), rounded up (2 decimals first). Shop price = app price + shop %. */
+function sellableOf(f){
+  const net = Number(f.trayNet) || 0;
+  return net > 0 ? r2(net * (1 - (Number(f.wastePct) || 0) / 100)) : Number(f.trayQty) || 0;
+}
 function autoPrices(f){
-  const cost = Number(f.trayCost), sell = Number(f.trayQty);
+  const cost = Number(f.trayCost), sell = sellableOf(f);
   if (!(cost > 0 && sell > 0)) return null;
-  const online = Math.ceil(Math.round(cost * (1 + (Number(f.profitPct) || 0) / 100) / sell * 100) / 100);
-  return { online, store: Math.ceil(Math.round(online * (1 + (Number(f.storePct) || 0) / 100) * 100) / 100) };
+  const online = Math.ceil(r2(cost / sell * (1 + (Number(f.profitPct) || 0) / 100)));
+  return { online, store: Math.ceil(r2(online * (1 + (Number(f.storePct) || 0) / 100))), perKg: cost / sell, sell };
 }
 function applyAuto(f){
+  const sell = sellableOf(f); if (sell > 0) f.trayQty = sell;   // trayQty always holds the calculated sellable
   if (!f.auto) return f;
   const a = autoPrices(f); if (a){ f.price = a.online; f.storePrice = a.store; }
   return f;
@@ -409,11 +417,13 @@ function normFruit(f){
   const n = { ...f, price:Number(f.price), step:Number(f.step) || 1, trayQty:Number(f.trayQty), trayNet:Number(f.trayNet) || Number(f.trayQty), trayCost:Number(f.trayCost) || 0,
     active: f.active === true || f.active === "TRUE" || f.active === "true",
     deleted: f.deleted === true || f.deleted === "TRUE" || f.deleted === "true" };
+  n.wastePct = f.wastePct === "" || f.wastePct == null ? WASTE_PCT : Number(f.wastePct);
   n.profitPct = f.profitPct === "" || f.profitPct == null ? PROFIT_PCT : Number(f.profitPct);
   n.storePct = f.storePct === "" || f.storePct == null ? STORE_PCT : Number(f.storePct);
   n.auto = f.auto === "" || f.auto == null ? n.trayCost > 0 : (f.auto === true || f.auto === "TRUE" || f.auto === "true");
   n.storePrice = Number(f.storePrice) || Math.ceil(n.price * (1 + n.storePct / 100));
   n.sizes = parseSizes(f.sizes);
+  const sell = sellableOf(n); if (sell > 0) n.trayQty = sell;
   return n;
 }
 const PALETTE = ["#B3123A","#C8202F","#F08A1C","#E8B923","#7DB33A","#2F7D46","#7A5A2B","#3B1F4A","#3A4A8C","#D9568C"];
@@ -1036,7 +1046,7 @@ function ownerBookHtml(){
           <p class="bk-calc-h"><strong>${esc(l.f.name)}</strong><b>${rupee(l.lineCost + l.lineWaste)}</b></p>
           <p>Had: ${r1(l.open)} ${u} from last night${l.trays ? ` + ${r1(l.trays)} ${word}${l.trays === 1 ? "" : "s"} × ${r1(l.net)} ${u} = <b>${r1(l.avail)} ${u}</b>` : ` = <b>${r1(l.avail)} ${u}</b>`}</p>
           <p>Sold: ${r1(l.avail)} − ${r1(l.close)} left${l.waste ? ` − ${r1(l.waste)} thrown` : ""} = <b>${fmtQty(Math.max(l.sold, 0), l.f.unit)}</b></p>
-          <p>Cost per ${u}: ${l.tc ? rupee(l.tc) : "₹0"} per ${word} ÷ ${r1(l.sell)} ${u} sellable = <b>${rupee2(l.cpu)}</b>${l.tc ? "" : ` <span class="bad">(add the ${word} cost on the Morning step)</span>`}</p>
+          <p>Cost per ${u}: ${l.tc ? rupee(l.tc) : "₹0"} per ${word} ÷ ${r2(l.sell)} ${u} sellable = <b>${rupee2(l.cpu)}</b>${l.tc ? "" : ` <span class="bad">(add the ${word} cost on the Morning step)</span>`}</p>
           <p>Sold cost: ${r1(Math.max(l.sold, 0))} × ${rupee2(l.cpu)} = <b>${rupee(l.lineCost)}</b>${l.waste ? `<br>Thrown cost: ${r1(l.waste)} × ${rupee2(l.cpu)} = <b class="bad">${rupee(l.lineWaste)}</b> (${l.wastePct}% wasted)` : ""}</p>
         </div>`; }).join("")}</div>` : ""}
       ${warn.map(([n, w]) => `<button class="bk-warn" data-act="bkStep" data-id="${n}">${esc(w)} <u>Fix</u></button>`).join("")}`;
@@ -1069,13 +1079,13 @@ function aiTools(){
       input_schema:{ type:"object", properties:{ shop, date, fruit_id:fruit, left:{ type:"number" }, thrown:{ type:"number" } }, required:["shop","date","fruit_id","left"] } },
     { name:"set_money", description:"Record the shop's money for a day. Counter UPI must not include app orders.",
       input_schema:{ type:"object", properties:{ shop, date, cash:{ type:"number" }, counter_upi:{ type:"number" }, other_costs:{ type:"number" } }, required:["shop","date"] } },
-    { name:"update_fruit", description:"Change a fruit's price settings or switch it on/off for sale. With automatic pricing, app and shop prices come from tray cost, sellable amount and percentages.",
-      input_schema:{ type:"object", properties:{ fruit_id:fruit, tray_cost:{ type:"number" }, tray_net:{ type:"number" }, sellable:{ type:"number" }, profit_pct:{ type:"number" }, shop_pct:{ type:"number" },
+    { name:"update_fruit", description:"Change a fruit's price settings or switch it on/off for sale. With automatic pricing: sellable = tray net × (1 − wastage%), cost per kg = tray cost ÷ sellable, app price = cost per kg × (1 + profit%) rounded up, shop price = app price + shop %.",
+      input_schema:{ type:"object", properties:{ fruit_id:fruit, tray_cost:{ type:"number" }, tray_net:{ type:"number" }, wastage_pct:{ type:"number" }, profit_pct:{ type:"number" }, shop_pct:{ type:"number" },
         on_sale:{ type:"boolean" }, app_price:{ type:"number", description:"Only for manual pricing; switches automatic pricing off" }, shop_price:{ type:"number", description:"Only for manual pricing" } }, required:["fruit_id"] } },
-    { name:"add_fruit", description:"Add a new fruit to the shop with automatic pricing (app and shop price come from tray cost, sellable per tray and the usual percentages). Ask for anything missing: tray cost, tray net weight and sellable per tray are all needed.",
+    { name:"add_fruit", description:"Add a new fruit to the shop with automatic pricing (sellable = net × (1 − wastage%), cost per kg = tray cost ÷ sellable, app price = cost per kg × (1 + profit%) rounded up, shop price = app price + shop %). Ask for anything missing: tray cost and tray net weight are needed; wastage defaults to 8%.",
       input_schema:{ type:"object", properties:{ name:{ type:"string", description:"English name" }, telugu_name:{ type:"string" }, unit:{ type:"string", enum:["kg","piece","box","size"] },
-        tray_cost:{ type:"number", description:"Cost per tray including transport" }, tray_net:{ type:"number", description:"Tray net weight (kg, pieces or boxes)" }, sellable:{ type:"number", description:"Sellable per tray, not more than tray net" },
-        on_sale:{ type:"boolean", description:"Default true" } }, required:["name","unit","tray_cost","tray_net","sellable"] } },
+        tray_cost:{ type:"number", description:"Cost per tray including transport" }, tray_net:{ type:"number", description:"Tray net weight (kg, pieces or boxes)" }, wastage_pct:{ type:"number", description:"Wastage %, default 8" },
+        on_sale:{ type:"boolean", description:"Default true" } }, required:["name","unit","tray_cost","tray_net"] } },
     { name:"delete_fruit", description:"Delete a fruit from the app (same as the Delete fruit button). Its past Daily book records stay.",
       input_schema:{ type:"object", properties:{ fruit_id:fruit }, required:["fruit_id"] } },
     { name:"rename_fruit", description:"Change a fruit's English name and/or Telugu name. Give at least one.",
@@ -1091,7 +1101,7 @@ function aiTools(){
 function aiContext(){
   const today = ymd(ist());
   const fruits = S.fruits.map(f => ({ id:f.id, name:f.name, unit:f.unit, on_sale:f.active, app_price:f.price, shop_price:f.storePrice, auto_price:f.auto,
-    tray_cost:f.trayCost, tray_net:netOf(f), sellable:f.trayQty, profit_pct:f.profitPct, shop_pct:f.storePct, sizes: isSize(f) ? f.sizes : undefined }));
+    tray_cost:f.trayCost, tray_net:netOf(f), wastage_pct:f.wastePct, sellable:sellableOf(f), cost_per_kg: f.trayCost > 0 && sellableOf(f) > 0 ? r2(f.trayCost / sellableOf(f)) : undefined, profit_pct:f.profitPct, shop_pct:f.storePct, sizes: isSize(f) ? f.sizes : undefined }));
   const days = [];
   dayList(today, 14).forEach(ds => CONFIG.SHOPS.forEach(s => {
     const r = bookRow(s.id, ds); if (!r) return;
@@ -1119,8 +1129,8 @@ You help the owner keep the Daily book, prices and app orders up to date, and yo
 
 Rules:
 - To change anything, call the tools. Each change is shown to the owner as a card and is only saved after they tap Confirm. Never say something is saved; say "Check and confirm below."
-- Tools: set_morning_purchase, set_opening_stock, set_night_count, set_money (Daily book); clear_fruit_entry (remove a wrong Daily book entry for one fruit, shop and day); update_fruit (prices, on/off sale); add_fruit (new fruit, automatic pricing; needs name, unit, tray cost, tray net weight and sellable per tray, so ask if any is missing); rename_fruit (English and/or Telugu name); delete_fruit (removes the fruit from the app, past Daily book records stay); update_order_status.
-- Daily book cost per kg = tray cost (with transport) ÷ sellable per tray (tray net weight only if sellable is empty). DATA shows it as cost_per_kg.
+- Tools: set_morning_purchase, set_opening_stock, set_night_count, set_money (Daily book); clear_fruit_entry (remove a wrong Daily book entry for one fruit, shop and day); update_fruit (prices, on/off sale); add_fruit (new fruit, automatic pricing; needs name, unit, tray cost and tray net weight, so ask if any is missing; wastage defaults to 8%); rename_fruit (English and/or Telugu name); delete_fruit (removes the fruit from the app, past Daily book records stay); update_order_status.
+- Pricing rules: sellable per tray = tray net × (1 − wastage%). Cost per kg = tray cost (with transport) ÷ sellable. App price = cost per kg × (1 + profit%), rounded up (2 decimals first). Shop price = app price + shop %. The Daily book uses the same cost per kg. DATA shows these as sellable, cost_per_kg, app_price, shop_price.
 - Supplier bill photo: read every line (fruit, number of trays or boxes, rate, amount) and every extra charge (transport, hamali, other). Cost per tray with transport = item rate + all extra charges spread equally over ALL trays on the bill, unless the owner says otherwise. Show the split clearly in your reply, for example "Transport ₹600 + hamali ₹200 = ₹800 ÷ 16 trays = ₹50 per tray", then each fruit's rate + ₹50.
 - For a bill: match each bill name to a fruit id in DATA.fruits (ask if unsure; for a fruit that isn't in DATA suggest add_fruit). If the owner says which items are for 1 Town or 2 Town, call set_morning_purchase for each fruit and shop with the trays for that shop and the cost per tray with transport. If it isn't clear which shop gets what, ask before calling any tool. Also call update_fruit once per fruit with the new tray_cost so prices update. Use today's date unless the owner says another day; never guess the date. Put everything in this one reply so it shows as one Confirm card, and call bill_summary once with the bill total.
 - Always show a date in full with its weekday, like "Saturday, 3 Oct 2026". If the owner names only a weekday that could mean more than one day, or that isn't in the table above, ask which date they mean before calling tools.
@@ -1190,7 +1200,7 @@ function aiValidate(t){
     if (a.date > ymd(ist())) return "That day is in the future.";
   }
   if (["set_morning_purchase","set_opening_stock","set_night_count","update_fruit","delete_fruit","rename_fruit","clear_fruit_entry"].includes(t.name) && !fruitById(a.fruit_id)) return `Unknown fruit "${a.fruit_id}".`;
-  for (const k of ["trays","tray_cost","amount","left","thrown","cash","counter_upi","other_costs","tray_net","sellable","profit_pct","shop_pct","app_price","shop_price","bill_total","charges_total","trays_total"]) if (!okNum(a[k])) return `Check the number for ${k.replace("_", " ")}.`;
+  for (const k of ["trays","tray_cost","amount","left","thrown","cash","counter_upi","other_costs","tray_net","wastage_pct","profit_pct","shop_pct","app_price","shop_price","bill_total","charges_total","trays_total"]) if (!okNum(a[k])) return `Check the number for ${k.replace("_", " ")}.`;
   if (t.name === "set_morning_purchase" && a.trays > 60) return "That's a lot of trays. Please check.";
   if (t.name === "update_order_status"){
     if (!S.ownerOrders.find(o => o.id === a.order_id)) return `Order ${a.order_id} not found.`;
@@ -1205,8 +1215,7 @@ function aiValidate(t){
     if (!["kg","piece","box","size"].includes(a.unit)) return "Unit must be kg, piece, box or size.";
     if (!(a.tray_cost > 0)) return "Enter the tray cost.";
     if (!(a.tray_net > 0)) return "Enter the tray net weight.";
-    if (!(a.sellable > 0)) return "Enter the sellable amount per tray.";
-    if (a.sellable > a.tray_net) return "Sellable can't be more than the tray net weight.";
+    if (a.wastage_pct !== undefined && !(a.wastage_pct >= 0 && a.wastage_pct <= 50)) return "Wastage must be between 0 and 50%.";
     if (a.on_sale !== undefined && typeof a.on_sale !== "boolean") return "Check on sale.";
   }
   if (t.name === "rename_fruit"){
@@ -1232,7 +1241,7 @@ function aiDescribe(t){
     case "set_night_count": return `${where}: <b>${esc(fName(a.fruit_id))}</b> left <b>${r1(a.left)} ${u}</b>${a.thrown != null ? `, thrown <b>${r1(a.thrown)} ${u}</b>` : ""}`;
     case "set_money": return `${where}: ${[a.cash != null ? `cash <b>${rupee(a.cash)}</b>` : "", a.counter_upi != null ? `counter UPI <b>${rupee(a.counter_upi)}</b>` : "", a.other_costs != null ? `other costs <b>${rupee(a.other_costs)}</b>` : ""].filter(Boolean).join(", ")}`;
     case "update_fruit": {
-      const ch = [a.tray_cost != null && `tray cost ${rupee(a.tray_cost)}`, a.tray_net != null && `tray net ${r1(a.tray_net)} ${u}`, a.sellable != null && `sellable ${r1(a.sellable)} ${u}`,
+      const ch = [a.tray_cost != null && `tray cost ${rupee(a.tray_cost)}`, a.tray_net != null && `tray net ${r1(a.tray_net)} ${u}`, a.wastage_pct != null && `wastage ${a.wastage_pct}%`,
         a.profit_pct != null && `profit ${a.profit_pct}%`, a.shop_pct != null && `shop price +${a.shop_pct}%`, a.on_sale != null && (a.on_sale ? "on sale" : "off sale"),
         a.app_price != null && `app price ${rupee(a.app_price)} (manual)`, a.shop_price != null && `shop price ${rupee(a.shop_price)}`].filter(Boolean);
       let after = "";
@@ -1241,7 +1250,7 @@ function aiDescribe(t){
     }
     case "add_fruit": {
       const g = aiNewFruit(a), un = a.unit === "size" ? "kg, sold by size" : a.unit === "piece" ? "pieces" : a.unit === "box" ? "boxes" : "kg";
-      return `Add new fruit <b>${esc(String(a.name || "").trim())}</b>${a.telugu_name ? ` (${esc(String(a.telugu_name).trim())})` : ""}, ${esc(un)}: tray cost <b>${rupee(a.tray_cost)}</b>, tray net <b>${r1(a.tray_net)}</b>, sellable <b>${r1(a.sellable)}</b> per tray, <b>${g.active ? "on sale" : "off sale"}</b> → app <b>${rupee(g.price)}</b>, shop <b>${rupee(g.storePrice)}</b>${a.unit === "size" ? ". Set its sizes on the Prices tab" : ""}`;
+      return `Add new fruit <b>${esc(String(a.name || "").trim())}</b>${a.telugu_name ? ` (${esc(String(a.telugu_name).trim())})` : ""}, ${esc(un)}: tray cost <b>${rupee(a.tray_cost)}</b>, tray net <b>${r1(a.tray_net)}</b>, wastage <b>${g.wastePct}%</b> → sellable <b>${r2(sellableOf(g))}</b> per tray, <b>${g.active ? "on sale" : "off sale"}</b> → app <b>${rupee(g.price)}</b>, shop <b>${rupee(g.storePrice)}</b>${a.unit === "size" ? ". Set its sizes on the Prices tab" : ""}`;
     }
     case "delete_fruit": return `<b>Delete ${esc(fName(a.fruit_id))}</b> from the app. Past Daily book records stay`;
     case "rename_fruit": {
@@ -1258,13 +1267,13 @@ function aiDescribe(t){
 function aiFruitPatch(f, a){
   if (a.tray_cost != null) f.trayCost = a.tray_cost;
   if (a.tray_net != null) f.trayNet = a.tray_net;
-  if (a.sellable != null) f.trayQty = a.sellable;
+  if (a.wastage_pct != null) f.wastePct = a.wastage_pct;
   if (a.profit_pct != null) f.profitPct = a.profit_pct;
   if (a.shop_pct != null) f.storePct = a.shop_pct;
   if (a.on_sale != null) f.active = !!a.on_sale;
   if (a.app_price != null){ f.auto = false; f.price = a.app_price; if (a.shop_price == null) f.storePrice = Math.ceil(a.app_price * (1 + (f.storePct || STORE_PCT) / 100)); }
   if (a.shop_price != null){ f.auto = false; f.storePrice = a.shop_price; }
-  if ((a.tray_cost != null || a.sellable != null || a.profit_pct != null || a.shop_pct != null) && a.app_price == null && a.shop_price == null && f.trayCost > 0) f.auto = true;
+  if ((a.tray_cost != null || a.tray_net != null || a.wastage_pct != null || a.profit_pct != null || a.shop_pct != null) && a.app_price == null && a.shop_price == null && f.trayCost > 0) f.auto = true;
   applyAuto(f); if (!(f.storePrice > 0)) f.storePrice = f.price;
   return f;
 }
@@ -1272,7 +1281,7 @@ function aiNewFruit(a){
   const name = String(a.name || "").trim(), used = allFruits();
   let id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30) || "fruit";
   const baseId = id; let n = 2; while (used.some(f => f.id === id)) id = baseId + "-" + n++;
-  return applyAuto({ id, name, te:String(a.telugu_name || "").trim(), unit:a.unit, price:0, step: a.unit === "kg" ? 0.5 : 1, trayQty:a.sellable, trayNet:a.tray_net, trayCost:a.tray_cost,
+  return applyAuto({ id, name, te:String(a.telugu_name || "").trim(), unit:a.unit, price:0, step: a.unit === "kg" ? 0.5 : 1, trayQty:a.tray_net, trayNet:a.tray_net, wastePct: a.wastage_pct != null ? a.wastage_pct : WASTE_PCT, trayCost:a.tray_cost,
     color:PALETTE[used.length % PALETTE.length], active: a.on_sale !== false, boxSize:"", photo:"", profitPct:PROFIT_PCT, storePct:STORE_PCT, auto:true, storePrice:0,
     sizes: a.unit === "size" ? [{ id:"s1", name:"Small", min:1, max:2 }, { id:"s2", name:"Medium", min:2, max:3 }, { id:"s3", name:"Large", min:3, max:4 }] : [] });
 }
@@ -1537,10 +1546,11 @@ function sizesEditor(f){
   </div>`;
 }
 function autoPriceText(f){
-  const a = autoPrices(f);
-  if (!a) return "Enter tray cost and sellable per tray to set the price.";
-  return `App price <strong>${rupee(a.online)}</strong>/${UNIT[f.unit].short}, shop price <strong>${rupee(a.store)}</strong>/${UNIT[f.unit].short}`;
+  const a = autoPrices(f), u = UNIT[f.unit].short;
+  if (!a) return "Enter the tray cost and net weight to set the price.";
+  return `Cost per ${u}: ${rupee(f.trayCost)} ÷ ${r2(a.sell)} sellable = <strong>${rupee2(a.perKg)}</strong>. App price <strong>${rupee(a.online)}</strong>/${u}, shop price <strong>${rupee(a.store)}</strong>/${u}`;
 }
+const sellableText = f => `Sellable: ${r2(sellableOf(f))} ${f.unit === "kg" || isSize(f) ? "kg" : f.unit === "piece" ? "pieces" : "boxes"} per ${isSize(f) ? "lot" : "tray"} (net − ${Number(f.wastePct) || 0}% wastage)`;
 function profitText(f){
   const size = Number(f.trayQty), price = Number(f.price), cost = Number(f.trayCost);
   const t = isSize(f) ? "lot" : "tray";
@@ -1551,10 +1561,11 @@ function profitText(f){
 function ownerFruitsHtml(){
   if (!S.editFruits){ S.editFruits = JSON.parse(JSON.stringify(S.fruits)); S.editGone = JSON.parse(JSON.stringify(S.goneFruits || [])); S.fruitsDirty = false; }
   return `<p class="onsale" id="onsale-count">${onSaleCount()}</p>
-  <p class="banner">Check every price before you share the app. Net weight is what the tray weighs. Sellable is what you can sell after wastage.</p>
+  <p class="banner">Check every price before you share the app. Net weight is what the tray weighs. Sellable = net − wastage.</p>
   <div class="card allpct">
-    <p class="lbl" style="margin:0 0 6px">For all fruits with automatic prices</p>
+    <p class="lbl" style="margin:0 0 6px">For all fruits (profit and shop % only for automatic prices)</p>
     <div class="fgrid">
+      <label>Wastage (%)<input class="in" id="all-waste" type="number" min="0" max="50" inputmode="decimal" value="${esc((S.editFruits[0] || {}).wastePct ?? WASTE_PCT)}"></label>
       <label>Profit on tray cost (%)<input class="in" id="all-profit" type="number" min="0" inputmode="decimal" value="${esc((S.editFruits.find(f => f.auto) || {}).profitPct ?? PROFIT_PCT)}"></label>
       <label>Shop price above app (%)<input class="in" id="all-store" type="number" min="0" inputmode="decimal" value="${esc((S.editFruits.find(f => f.auto) || {}).storePct ?? STORE_PCT)}"></label>
       <button class="ghost applyall" data-act="applyAllPct">Apply to all</button>
@@ -1568,8 +1579,9 @@ function ownerFruitsHtml(){
       <div class="fgrid">
         <label>${isSize(f) ? "Lot" : "Tray"} cost with transport<input class="in" type="number" min="0" inputmode="numeric" data-field="trayCost" value="${f.trayCost ? esc(f.trayCost) : ""}" placeholder="₹"></label>
         <label>${isSize(f) ? "Lot weight (kg)" : "Tray net weight"}<input class="in" type="number" min="0" step="0.5" inputmode="decimal" data-field="trayNet" value="${esc(f.trayNet || f.trayQty)}"></label>
-        <label>Sellable per ${isSize(f) ? "lot" : "tray"} (${f.unit === "kg" || isSize(f) ? "kg" : f.unit === "piece" ? "pieces" : "boxes"})<input class="in" type="number" min="0" step="0.5" inputmode="decimal" data-field="trayQty" value="${esc(f.trayQty)}"></label>
+        <label>Wastage (%)<input class="in" type="number" min="0" max="50" step="1" inputmode="decimal" data-field="wastePct" value="${esc(f.wastePct)}"></label>
       </div>
+      <p class="note" data-sellable>${sellableText(f)}</p>
       <label class="switch autosw"><input type="checkbox" data-field="auto" ${f.auto ? "checked" : ""}> Set prices automatically from ${isSize(f) ? "lot" : "tray"} cost</label>
       ${f.auto ? `<div class="fgrid">
         <label>Profit on ${isSize(f) ? "lot" : "tray"} cost (%)<input class="in" type="number" min="0" step="1" inputmode="decimal" data-field="profitPct" value="${esc(f.profitPct)}"></label>
@@ -1613,7 +1625,7 @@ function ownerFruitsHtml(){
       <div class="fgrid">
         <label>Price<input class="in" id="nf-price" type="number" min="0" inputmode="decimal" placeholder="₹"></label>
         <label>Tray net weight<input class="in" id="nf-net" type="number" min="0" step="0.5" inputmode="decimal" placeholder="e.g. 10"></label>
-        <label>Sellable per tray<input class="in" id="nf-sell" type="number" min="0" step="0.5" inputmode="decimal" placeholder="same as net"></label>
+        <label>Wastage (%)<input class="in" id="nf-waste" type="number" min="0" max="50" inputmode="decimal" value="${WASTE_PCT}"></label>
         <label>Tray cost with transport<input class="in" id="nf-cost" type="number" min="0" inputmode="numeric" placeholder="₹ (optional)"></label>
       </div>
       <fieldset><legend>Colour on the list</legend>
@@ -1819,16 +1831,16 @@ const ACTIONS = {
     const err = m => { document.getElementById("nf-err").textContent = m; };
     const name = val("nf-name"), te = val("nf-te");
     const unit = (document.querySelector('input[name="nf-unit"]:checked') || {}).value || "kg";
-    const price = Number(val("nf-price")), net = Number(val("nf-net")), sell = Number(val("nf-sell")) || net, cost = Number(val("nf-cost")) || 0;
+    const price = Number(val("nf-price")), net = Number(val("nf-net")), waste = val("nf-waste") === "" ? WASTE_PCT : Number(val("nf-waste")), cost = Number(val("nf-cost")) || 0;
     const color = (document.querySelector('input[name="nf-color"]:checked') || {}).value || PALETTE[0];
     if (!name) return err("Enter the fruit name.");
     if (S.editFruits.some(f => f.name.toLowerCase() === name.toLowerCase())) return err(`${name} is already in the list.`);
     if (!(price > 0) && !(cost > 0)) return err("Enter a price, or a tray cost to set the price automatically.");
     if (!(net > 0)) return err("Enter how much one tray holds.");
-    if (sell > net) return err("Sellable can't be more than the tray net weight.");
+    if (!(waste >= 0 && waste < 100)) return err("Wastage must be between 0 and 50%.");
     let id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30) || "fruit";
     const baseId = id; let n = 2; while (S.editFruits.some(f => f.id === id)) id = baseId + "-" + n++;
-    S.editFruits.push({ id, name, te, unit, price, step: unit === "kg" ? 0.5 : 1, trayQty: sell, trayNet: net, trayCost: cost, color, active: true, boxSize: unit === "box" ? val("nf-box") : "", photo: S.newPhoto || "", _new: true,
+    S.editFruits.push({ id, name, te, unit, price, step: unit === "kg" ? 0.5 : 1, trayQty: net, trayNet: net, wastePct: waste, trayCost: cost, color, active: true, boxSize: unit === "box" ? val("nf-box") : "", photo: S.newPhoto || "", _new: true,
       sizes: unit === "size" ? [{ id:"s1", name:"Small", min:1, max:2 }, { id:"s2", name:"Medium", min:2, max:3 }, { id:"s3", name:"Large", min:3, max:4 }] : [],
       profitPct: PROFIT_PCT, storePct: STORE_PCT, auto: cost > 0, storePrice: Math.ceil(price * (1 + STORE_PCT / 100)) });
     applyAuto(S.editFruits[S.editFruits.length - 1]);
@@ -1837,11 +1849,11 @@ const ACTIONS = {
     const card = document.querySelector(`[data-fid="${CSS.escape(id)}"]`); if (card) card.scrollIntoView({ block:"center" });
   },
   applyAllPct(){
-    const p = Number(document.getElementById("all-profit").value), s = Number(document.getElementById("all-store").value);
-    if (!(p >= 0) || !(s >= 0)) return toast("Enter both percentages.");
-    let n = 0; S.editFruits.forEach(f => { if (f.auto){ f.profitPct = p; f.storePct = s; applyAuto(f); n++; } });
-    if (n) S.fruitsDirty = true;
-    render(); toast(n ? `Updated ${n} ${n === 1 ? "fruit" : "fruits"}. Press Save prices to keep it.` : "No fruits use automatic prices yet.");
+    const w = Number(document.getElementById("all-waste").value), p = Number(document.getElementById("all-profit").value), s = Number(document.getElementById("all-store").value);
+    if (!(w >= 0 && w < 100) || !(p >= 0) || !(s >= 0)) return toast("Enter wastage, profit and shop percentages.");
+    S.editFruits.forEach(f => { f.wastePct = w; if (f.auto){ f.profitPct = p; f.storePct = s; } applyAuto(f); });
+    if (S.editFruits.length) S.fruitsDirty = true;
+    render(); toast(`Updated ${S.editFruits.length} ${S.editFruits.length === 1 ? "fruit" : "fruits"}. Press Save prices to keep it.`);
   },
   addSize(fid){
     const f = S.editFruits.find(x => x.id === fid); if (!f) return;
@@ -1887,7 +1899,7 @@ const ACTIONS = {
       if (bs) return fail(`${f.name}: check the sizes. Each needs a name, and "to kg" must be at least "from kg".`);
     }
     const autoMissing = S.editFruits.find(f => f.active && f.auto && !autoPrices(f));
-    if (autoMissing) return fail(`${autoMissing.name} needs a tray cost and sellable per tray for automatic prices.`);
+    if (autoMissing) return fail(`${autoMissing.name} needs a tray cost and net weight for automatic prices.`);
     if (bad) return fail(`${bad.name} needs a price and a tray size, or turn it off.`);
     if (btn) btn.disabled = true;
     S.editFruits.forEach(f => { applyAuto(f); if (!(Number(f.storePrice) > 0)) f.storePrice = f.price; });
@@ -1917,6 +1929,7 @@ document.addEventListener("input", e => {
   applyAuto(f); markDirty(); syncOnSale(card, f);
   if (el.dataset.field === "auto"){ if (!f.auto && !f.storePrice) f.storePrice = Math.ceil(f.price * (1 + (f.storePct || STORE_PCT) / 100)); render(); return; }
   card.querySelector("[data-profit]").textContent = profitText(f);
+  const sl = card.querySelector("[data-sellable]"); if (sl) sl.textContent = sellableText(f);
   const ap = card.querySelector("[data-autoprice]"); if (ap) ap.innerHTML = autoPriceText(f);
   if (isSize(f)) (f.sizes || []).forEach((s, i) => { const el2 = card.querySelector(`[data-szp="${CSS.escape(f.id + "|" + i)}"]`); if (el2) el2.innerHTML = szPriceText(f, s); });
 });
