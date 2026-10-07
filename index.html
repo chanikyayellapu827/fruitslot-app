@@ -2086,14 +2086,25 @@ document.addEventListener("input", e => {
   if (e.target.id !== "ai-in") return;
   S.aiDraft = e.target.value; e.target.style.height = "auto"; e.target.style.height = Math.min(140, e.target.scrollHeight) + "px";
 });
+/* A pasted image (Ctrl+V, or long-press Paste on a phone) is treated exactly like one chosen with the paperclip. Pasted text works as normal. */
+function aiAttachPhoto(file){
+  toast("Preparing photo…");
+  billPhotoFromFile(file).then(data => { S.aiPhoto = data; render(); const t = document.getElementById("ai-in"); if (t) t.focus(); }).catch(err => toast(err.message));
+}
+document.addEventListener("paste", e => {
+  if (e.target.id !== "ai-in" || S.aiBusy) return;
+  const cd = e.clipboardData; if (!cd) return;
+  const file = [...(cd.files || [])].find(f => f.type.startsWith("image/")) || [...(cd.items || [])].filter(i => i.kind === "file" && i.type.startsWith("image/")).map(i => i.getAsFile()).find(Boolean);
+  if (!file) return;
+  e.preventDefault();
+  aiAttachPhoto(file);
+});
 document.addEventListener("keydown", e => {
   if (e.target.id === "ai-in" && e.key === "Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); ACTIONS.aiSend(); }
 });
 document.addEventListener("change", e => {
   if (e.target.id === "ai-file"){
-    const file = e.target.files && e.target.files[0]; if (!file) return;
-    toast("Preparing photo…");
-    billPhotoFromFile(file).then(data => { S.aiPhoto = data; render(); const t = document.getElementById("ai-in"); if (t) t.focus(); }).catch(err => toast(err.message));
+    const file = e.target.files && e.target.files[0]; if (file) aiAttachPhoto(file);
     return;
   }
   if (e.target.id === "dash-date" && e.target.value){ S.dashDate = e.target.value; render(); return; }
