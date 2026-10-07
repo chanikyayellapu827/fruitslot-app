@@ -42,6 +42,13 @@ FruitSlot is a fruit pre-order and shop management PWA for two shops in Eluru: *
 3. Tomorrow: expected counter sales (average of the last 3 recorded days, mixed with the same weekday in earlier weeks when there are at least 2) plus app pre-orders; then suggested trays per fruit = (expected kg + pre-order kg − stock left) ÷ sellable per tray, rounded up, never negative, with a Share on WhatsApp button.
 4. Result: today's profit and how each fruit was worked out.
 
+## Supplied shop (1 Town)
+
+- `CONFIG.SHOPS` marks 1 Town with `supplied: true`. Its fruit is billed to the owner's brother at cost.
+- Its Daily book Result shows "Billed to brother: ₹X" (sum of tray cost × trays) instead of profit. The numbers are still saved as before, so old entries display.
+- "Brother paid" entries (date, amount) are added on the Dashboard and saved in the 1 Town Daily book row for that date (`brotherPaid`, needs the current `Code.gs`). The Dashboard shows billed, paid and the running balance owed.
+- 1 Town is left out of the Dashboard's combined profit, sales, waste and charts.
+
 ## Rules
 
 - Keep everything in one `index.html`.
