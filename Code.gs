@@ -192,7 +192,7 @@ function readBook_(){
 function saveBook_(row){
   if (!row || !/^\d{4}-\d{2}-\d{2}$/.test(String(row.date))) throw new Error("Pick a valid day.");
   if (SHOPS.indexOf(row.shop) < 0) throw new Error("Pick a shop.");
-  const data = JSON.stringify({ fruits: row.fruits || {}, cash: row.cash, upi: row.upi, expenses: row.expenses, updated: row.updated });
+  const data = JSON.stringify({ fruits: row.fruits || {}, cash: row.cash, upi: row.upi, expenses: row.expenses, brotherPaid: Array.isArray(row.brotherPaid) ? row.brotherPaid.slice(0, 200).map(p => ({ amount: Number(p && p.amount) || 0 })) : undefined, updated: row.updated });
   if (data.length > 40000) throw new Error("Entry is too large.");
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
