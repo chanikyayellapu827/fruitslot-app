@@ -221,6 +221,13 @@ button.big{font-size:1.15rem;min-height:58px}
 .ai-card li.cancelled{opacity:.55}
 .ai-card li.error .ai-st{color:var(--bad);font-weight:700}
 .ai-card em{font-style:normal;font-size:.85rem}
+.ai-card li.ai-grp{display:flex;justify-content:space-between;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid var(--line);font-size:.95rem}
+.ai-card li.ai-sum{display:block;margin-top:6px;padding:8px 10px;border-radius:10px;background:var(--bg,#f2f5ec);font-size:.95rem}
+.ai-thumb{display:block;max-width:150px;max-height:150px;border-radius:10px;margin-bottom:6px}
+.ai-prev{position:relative;display:inline-block;margin:0 0 8px}
+.ai-prev img{display:block;height:64px;width:auto;max-width:120px;border-radius:10px;border:1px solid var(--line)}
+.ai-x{position:absolute;top:-8px;right:-8px;width:26px;height:26px;border-radius:50%;border:0;background:var(--ink,#222);color:#fff;font-size:1rem;line-height:1;padding:0}
+.ai-clip{min-height:46px;padding:0 14px;font-size:1.2rem}
 .ai-chips{display:grid;gap:8px}
 .ai-chips .ghost{text-align:left;min-height:44px;padding:8px 12px;border-radius:12px;font-weight:500;background:var(--surface)}
 .ai-dots{display:flex;gap:5px;padding:14px 16px}
@@ -519,6 +526,18 @@ async function photoFromFile(file){
     let q = 0.82, out = c.toDataURL("image/jpeg", q);
     while (out.length > 40000 && q > 0.35){ q -= 0.1; out = c.toDataURL("image/jpeg", q); }
     if (out.length > 45000) throw new Error("This picture is too detailed. Try a simpler close-up photo.");
+    return out;
+  } finally { URL.revokeObjectURL(url); }
+}
+async function billPhotoFromFile(file){   // bill photo for the assistant: longest side 1600 px, JPEG about 0.8
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("This picture can't be opened. Try a JPG or PNG photo.")); i.src = url; });
+    const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight)), w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+    let q = 0.8, out = c.toDataURL("image/jpeg", q);
+    while (out.length > 1500000 && q > 0.5){ q -= 0.1; out = c.toDataURL("image/jpeg", q); }   // keep one photo well inside the request size
     return out;
   } finally { URL.revokeObjectURL(url); }
 }
@@ -1063,6 +1082,8 @@ function aiTools(){
       input_schema:{ type:"object", properties:{ fruit_id:fruit, name:{ type:"string" }, telugu_name:{ type:"string" } }, required:["fruit_id"] } },
     { name:"clear_fruit_entry", description:"Clear everything recorded in the Daily book for one fruit at one shop on one day (opening stock, trays bought, night count, thrown). Use it to remove a wrong entry.",
       input_schema:{ type:"object", properties:{ shop, date, fruit_id:fruit }, required:["shop","date","fruit_id"] } },
+    { name:"bill_summary", description:"Saves nothing. Call it once, in the same reply, whenever you propose entries from a supplier bill, so the owner can compare the bill total with the sum of the entries on the card.",
+      input_schema:{ type:"object", properties:{ bill_total:{ type:"number", description:"Grand total payable on the bill, including transport, hamali and other charges" }, charges_total:{ type:"number", description:"Transport + hamali + other charges on the bill" }, trays_total:{ type:"number", description:"Number of trays or boxes on the bill" } }, required:["bill_total"] } },
     { name:"update_order_status", description:"Change an app order's status: paid (payment received), rejected (payment not found), picked (customer collected), pending.",
       input_schema:{ type:"object", properties:{ order_id:{ type:"string" }, status:{ type:"string", enum:["pending","paid","picked","rejected"] } }, required:["order_id","status"] } }
   ];
@@ -1100,6 +1121,8 @@ Rules:
 - To change anything, call the tools. Each change is shown to the owner as a card and is only saved after they tap Confirm. Never say something is saved; say "Check and confirm below."
 - Tools: set_morning_purchase, set_opening_stock, set_night_count, set_money (Daily book); clear_fruit_entry (remove a wrong Daily book entry for one fruit, shop and day); update_fruit (prices, on/off sale); add_fruit (new fruit, automatic pricing; needs name, unit, tray cost, tray net weight and sellable per tray, so ask if any is missing); rename_fruit (English and/or Telugu name); delete_fruit (removes the fruit from the app, past Daily book records stay); update_order_status.
 - Daily book cost per kg = tray cost (with transport) ÷ sellable per tray (tray net weight only if sellable is empty). DATA shows it as cost_per_kg.
+- Supplier bill photo: read every line (fruit, number of trays or boxes, rate, amount) and every extra charge (transport, hamali, other). Cost per tray with transport = item rate + all extra charges spread equally over ALL trays on the bill, unless the owner says otherwise. Show the split clearly in your reply, for example "Transport ₹600 + hamali ₹200 = ₹800 ÷ 16 trays = ₹50 per tray", then each fruit's rate + ₹50.
+- For a bill: match each bill name to a fruit id in DATA.fruits (ask if unsure; for a fruit that isn't in DATA suggest add_fruit). If the owner says which items are for 1 Town or 2 Town, call set_morning_purchase for each fruit and shop with the trays for that shop and the cost per tray with transport. If it isn't clear which shop gets what, ask before calling any tool. Also call update_fruit once per fruit with the new tray_cost so prices update. Use today's date unless the owner says another day; never guess the date. Put everything in this one reply so it shows as one Confirm card, and call bill_summary once with the bill total.
 - Always show a date in full with its weekday, like "Saturday, 3 Oct 2026". If the owner names only a weekday that could mean more than one day, or that isn't in the table above, ask which date they mean before calling tools.
 - If the shop is not clear, ask which shop before calling tools. If the day is not said, use today. "Yesterday" means the day before today.
 - Use fruit ids from DATA.fruits. Amounts: unit "kg" and "size" fruits in kg, "piece" in pieces, "box" in boxes. Trays means trays or lots bought; tray cost includes transport.
@@ -1129,7 +1152,7 @@ function aiHistoryForApi(){
       pending = keep.filter(b => b.type === "tool_use").map(b => b.id);
     } else {
       results = blocks.filter(b => b.type === "tool_result" && pending.includes(b.tool_use_id));   // answers to anything else are dropped
-      const lead = pending.map(answer), text = blocks.filter(b => b.type === "text" && String(b.text || "").trim());
+      const lead = pending.map(answer), text = blocks.filter(b => (b.type === "text" && String(b.text || "").trim()) || b.type === "image");
       pending = []; results = [];
       if (lead.length || text.length) out.push({ role:"user", content:[...lead, ...text] });
     }
@@ -1138,7 +1161,7 @@ function aiHistoryForApi(){
   // keep the last 20 messages. Start on a user message and drop its tool_results (their tool_use is cut off), so no pair is split
   for (let start = Math.max(0, out.length - 20); start < out.length; start++){
     if (out[start].role !== "user") continue;
-    const text = out[start].content.filter(b => b.type === "text");
+    const text = out[start].content.filter(b => b.type === "text" || b.type === "image");
     if (text.length) return [{ role:"user", content:text }, ...out.slice(start + 1)];
   }
   return [];
@@ -1151,7 +1174,7 @@ async function aiCall(){
   let r;
   try {
     r = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ model:AI_MODEL_PREVIEW, max_tokens:1000, ...body }) });
+      body: JSON.stringify({ model:AI_MODEL_PREVIEW, max_tokens:4096, ...body }) });
   } catch(e){ throw new Error("The assistant needs the Google Sheet backend with your AI key. See the README, \"AI assistant\"."); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.content) throw new Error((j.error && j.error.message) || "The assistant needs the Google Sheet backend with your AI key. See the README, \"AI assistant\".");
@@ -1167,12 +1190,13 @@ function aiValidate(t){
     if (a.date > ymd(ist())) return "That day is in the future.";
   }
   if (["set_morning_purchase","set_opening_stock","set_night_count","update_fruit","delete_fruit","rename_fruit","clear_fruit_entry"].includes(t.name) && !fruitById(a.fruit_id)) return `Unknown fruit "${a.fruit_id}".`;
-  for (const k of ["trays","tray_cost","amount","left","thrown","cash","counter_upi","other_costs","tray_net","sellable","profit_pct","shop_pct","app_price","shop_price"]) if (!okNum(a[k])) return `Check the number for ${k.replace("_", " ")}.`;
+  for (const k of ["trays","tray_cost","amount","left","thrown","cash","counter_upi","other_costs","tray_net","sellable","profit_pct","shop_pct","app_price","shop_price","bill_total","charges_total","trays_total"]) if (!okNum(a[k])) return `Check the number for ${k.replace("_", " ")}.`;
   if (t.name === "set_morning_purchase" && a.trays > 60) return "That's a lot of trays. Please check.";
   if (t.name === "update_order_status"){
     if (!S.ownerOrders.find(o => o.id === a.order_id)) return `Order ${a.order_id} not found.`;
     if (!["pending","paid","picked","rejected"].includes(a.status)) return "Unknown status.";
   }
+  if (t.name === "bill_summary" && !(a.bill_total > 0)) return "Enter the bill total.";
   if (t.name === "add_fruit"){
     const name = String(a.name || "").trim();
     if (!name) return "Enter the fruit name.";
@@ -1196,7 +1220,7 @@ function aiValidate(t){
     const r = bookRow(a.shop, a.date);
     if (!r || !r.fruits || !r.fruits[a.fruit_id]) return `Nothing saved for ${fName(a.fruit_id)} on that day.`;
   }
-  if (!["set_morning_purchase","set_opening_stock","set_night_count","set_money","update_fruit","update_order_status","add_fruit","delete_fruit","rename_fruit","clear_fruit_entry"].includes(t.name)) return `Unknown action "${t.name}".`;
+  if (!["set_morning_purchase","set_opening_stock","set_night_count","set_money","update_fruit","update_order_status","add_fruit","delete_fruit","rename_fruit","clear_fruit_entry","bill_summary"].includes(t.name)) return `Unknown action "${t.name}".`;
   return null;
 }
 const aiSafe = (fn, t, fallback) => { try { return fn(t); } catch(e){ return fallback; } };   // one odd tool call must not stop the chat from drawing
@@ -1226,6 +1250,7 @@ function aiDescribe(t){
       return `Rename: ${ch.join(", ")}`;
     }
     case "clear_fruit_entry": return `${where}: <b class="bad">clear</b> everything recorded for <b>${esc(fName(a.fruit_id))}</b> in the Daily book`;
+    case "bill_summary": return `Bill total <b>${rupee(a.bill_total)}</b>`;
     case "update_order_status": { const o = S.ownerOrders.find(x => x.id === a.order_id) || {}; return `Order <b>${esc(a.order_id)}</b>${o.name ? ` (${esc(o.name)}, ${rupee(o.total)})` : ""}: mark <b>${esc(STATUS_OWNER[a.status] || a.status)}</b>`; }
   }
   return esc(t.name);
@@ -1278,6 +1303,7 @@ async function aiApply(t){
   const a = t.input;
   const book = aiBookFn(t); if (book) return aiBookPatch(a.shop, a.date, book);
   switch (t.name){
+    case "bill_summary": return;   // display only
     case "update_fruit": {
       const list = JSON.parse(JSON.stringify(S.fruits)); const f = list.find(x => x.id === a.fruit_id); aiFruitPatch(f, a);
       setFruits(await api.saveFruits(S.ownerKey, list.concat(S.goneFruits))); S.editFruits = null; return;
@@ -1302,35 +1328,53 @@ async function aiApply(t){
 function aiText(s){
   return esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").split("\n").map(l => /^\s*[-•]\s+/.test(l) ? `<span class="ai-li">${l.replace(/^\s*[-•]\s+/, "")}</span>` : l).join("<br>").replace(/<br>(<span class="ai-li">)/g, "$1").replace(/(<\/span>)<br>/g, "$1");
 }
-function aiSave(){ LS.set("fs_ai", S.ai.slice(-60)); LS.set("fs_ai_act", S.aiAct); LS.set("fs_ai_q", S.aiQueue); }
+const aiNoPhotos = m => Array.isArray(m.content) && m.content.some(b => b.type === "image") ? { ...m, content:m.content.map(b => b.type === "image" ? { type:"text", text:"[bill photo]" } : b) } : m;
+function aiSave(){ LS.set("fs_ai", S.ai.slice(-60).map(aiNoPhotos)); LS.set("fs_ai_act", S.aiAct); LS.set("fs_ai_q", S.aiQueue); }
 function ownerAiHtml(){
   const chips = ["Today's profit for both shops?", "1 Town: bought 2 pomegranate trays at 3350", "Which fruit wasted most this week?", "Any payments I still need to check?"];
   const msgs = S.ai.map((m, i) => {
     if (m.role === "user"){
-      const t = (Array.isArray(m.content) ? m.content : [{ type:"text", text:m.content }]).filter(b => b.type === "text").map(b => b.text).join("\n");
-      return t ? `<div class="ai-msg me"><div class="ai-b">${aiText(t)}</div></div>` : "";
+      const ub = Array.isArray(m.content) ? m.content : [{ type:"text", text:m.content }];
+      const t = ub.filter(b => b.type === "text").map(b => b.text).join("\n");
+      const pics = ub.filter(b => b.type === "image" && b.source && b.source.data).map(b => `<img class="ai-thumb" alt="Bill photo" src="data:${esc(b.source.media_type)};base64,${esc(b.source.data)}">`).join("");
+      return t || pics ? `<div class="ai-msg me"><div class="ai-b">${pics}${aiText(t)}</div></div>` : "";
     }
     const blocks = Array.isArray(m.content) ? m.content : [{ type:"text", text:String(m.content) }];
     const text = blocks.filter(b => b.type === "text").map(b => b.text).join("\n").trim();
     const tools = blocks.filter(b => b.type === "tool_use");
     const latest = i === aiLatestCard();
     const pending = latest ? tools.filter(t => (S.aiAct[t.id] || {}).s === "pending" || !S.aiAct[t.id]) : [];   // older cards show status only
+    const row = t => { const st0 = S.aiAct[t.id] || { s:"pending" }, st = st0.s === "pending" && !latest ? { s:"cancelled" } : st0, bad = aiSafe(aiValidate, t, "Couldn't check this change.");
+      return `<li class="${st.s}"><span class="ai-st">${st.s === "applied" ? "✓" : st.s === "cancelled" ? "–" : st.s === "error" || bad ? "!" : "•"}</span><span>${aiSafe(aiDescribe, t, esc(t.name))}${bad && st.s === "pending" ? `<br><em class="bad">${esc(bad)} This one will be skipped.</em>` : ""}${st.s === "error" ? `<br><em class="bad">${esc(st.msg || "Failed")}</em>` : ""}</span></li>`; };
+    const cost = t => Number((t.input || {}).trays) * (Number((t.input || {}).tray_cost) || Number((fruitById((t.input || {}).fruit_id) || {}).trayCost) || 0) || 0;
+    const bill = tools.find(t => t.name === "bill_summary"), rest = tools.filter(t => t !== bill);
+    const shopOf = t => t.input && SHOP_IDS().includes(t.input.shop) ? t.input.shop : "";
+    const keys = [...new Set(rest.map(shopOf))].sort((x, y) => (x === "") - (y === ""));
+    const grouped = bill || keys.length > 1;
+    const rows = grouped ? keys.map(k => { const items = rest.filter(t => shopOf(t) === k), buys = items.filter(t => t.name === "set_morning_purchase");
+      return `<li class="ai-grp"><strong>${esc(k ? shopShort(k) : "Prices and other changes")}</strong>${buys.length ? `<span>${rupee(buys.reduce((n, t) => n + cost(t), 0))}</span>` : ""}</li>${items.map(row).join("")}`; }).join("") : rest.map(row).join("");
+    let sum = "";
+    if (bill){
+      const mine = rest.filter(t => t.name === "set_morning_purchase").reduce((n, t) => n + cost(t), 0), tot = Number(bill.input.bill_total) || 0, diff = Math.round(mine - tot);
+      const ok = Math.abs(diff) <= Math.max(2, tot * 0.005);
+      sum = `<li class="ai-sum ${(S.aiAct[bill.id] || {}).s || "pending"}"><span></span><span>Bill total <b>${rupee(tot)}</b><br>Sum of the entries <b>${rupee(mine)}</b><br>${ok ? `<b class="good">They match ✓</b>` : `<b class="bad">Difference ${rupee(Math.abs(diff))}. Check before confirming.</b>`}</span></li>`;
+    }
     const card = tools.length ? `<div class="ai-card">
         <p class="ai-card-h">${pending.length ? "Check and confirm" : "Changes"}</p>
-        <ul>${tools.map(t => { const st0 = S.aiAct[t.id] || { s:"pending" }, st = st0.s === "pending" && !latest ? { s:"cancelled" } : st0, bad = aiSafe(aiValidate, t, "Couldn't check this change.");
-          return `<li class="${st.s}"><span class="ai-st">${st.s === "applied" ? "✓" : st.s === "cancelled" ? "–" : st.s === "error" || bad ? "!" : "•"}</span><span>${aiSafe(aiDescribe, t, esc(t.name))}${bad && st.s === "pending" ? `<br><em class="bad">${esc(bad)} This one will be skipped.</em>` : ""}${st.s === "error" ? `<br><em class="bad">${esc(st.msg || "Failed")}</em>` : ""}</span></li>`; }).join("")}</ul>
+        <ul>${rows}${sum}</ul>
         ${pending.length ? `<div class="actions"><button class="yes" data-act="aiConfirm" data-id="${i}">Confirm</button><button data-act="aiCancel" data-id="${i}">Cancel</button></div>` : ""}
       </div>` : "";
     return `<div class="ai-msg bot">${text ? `<div class="ai-b">${aiText(text)}</div>` : ""}${card}</div>`;
   }).join("");
-  return `<div class="ai-wrap">
+  return `<div class="ai-wrap" ${S.aiPhoto ? 'style="padding-bottom:100px"' : ""}>
     <div class="ai-top"><p class="ai-intro"><span class="ai-spark" aria-hidden="true">✦</span> Ask about your shops, or tell me what you bought, counted or got paid. I'll show every change for you to confirm.</p>
       ${S.ai.length ? `<button class="link" data-act="aiReset">New chat</button>` : ""}</div>
     <div class="ai-log" id="ai-log">${msgs || `<div class="ai-chips">${chips.map(c => `<button class="ghost" data-act="aiChip" data-arg="${esc(c)}">${esc(c)}</button>`).join("")}</div>`}
       ${S.aiBusy ? `<div class="ai-msg bot"><div class="ai-b ai-dots"><i></i><i></i><i></i></div></div>` : ""}</div>
     <p class="err" id="err" role="alert"></p>
   </div>
-  <div class="bar ai-bar"><div class="bar-in">
+  <div class="bar ai-bar">${S.aiPhoto ? `<div class="ai-prev"><img src="${esc(S.aiPhoto)}" alt="Bill photo ready to send"><button class="ai-x" data-act="aiPhotoRemove" aria-label="Remove photo">×</button></div>` : ""}<div class="bar-in">
+    <button class="ghost ai-clip" data-act="aiPickPhoto" ${S.aiBusy ? "disabled" : ""} aria-label="Add a bill photo">📎</button><input type="file" id="ai-file" accept="image/*" class="vh" tabindex="-1" aria-hidden="true">
     <textarea id="ai-in" class="in" rows="1" placeholder="Type or speak…" aria-label="Message to the assistant">${esc(S.aiDraft || "")}</textarea>
     <button class="primary" data-act="aiSend" ${S.aiBusy ? "disabled" : ""} aria-label="Send">Send</button>
   </div></div>`;
@@ -1661,7 +1705,7 @@ const ACTIONS = {
   ownerLogout(){ S.ownerKey = ""; LS.set("fs_owner", ""); S.ownerOrders = []; S.editFruits = null; S.view = "shop"; render(); },
   ownerTab(tab){ S.ownerTab = tab; if (tab === "book") S.bookStep = ist().getHours() >= 16 ? 2 : 1; if (tab === "fruits"){ S.editFruits = null; S.editOpen = null; } if (tab === "book") S.bookDraft = null; render(); },
   aiChip(_, text){ S.aiDraft = text; render(); const t = document.getElementById("ai-in"); if (t){ t.focus(); t.setSelectionRange(t.value.length, t.value.length); } },
-  aiReset(){ S.ai = []; S.aiAct = {}; S.aiQueue = []; S.aiDraft = ""; aiSave(); render(); },
+  aiReset(){ S.ai = []; S.aiAct = {}; S.aiQueue = []; S.aiDraft = ""; S.aiPhoto = ""; aiSave(); render(); },
   async aiConfirm(i, _, btn){
     const m = S.ai[Number(i)]; if (!m || Number(i) !== aiLatestCard()) return; btn.disabled = true;
     const tools = (m.content || []).filter(b => b.type === "tool_use");
@@ -1697,24 +1741,30 @@ const ACTIONS = {
     (m.content || []).filter(b => b.type === "tool_use").forEach(t => { if (!S.aiAct[t.id] || S.aiAct[t.id].s === "pending"){ S.aiAct[t.id] = { s:"cancelled" }; S.aiQueue.push({ type:"tool_result", tool_use_id:t.id, content:"The owner cancelled this. Nothing was saved." }); } });
     aiSave(); render(); scrollAi();
   },
+  aiPickPhoto(){ const f = document.getElementById("ai-file"); if (!f) return; f.value = ""; try { f.click(); } catch(e){ toast("This browser can't open photos. Open the app link in Chrome or Safari."); } },
+  aiPhotoRemove(){ S.aiPhoto = ""; render(); const t = document.getElementById("ai-in"); if (t) t.focus(); },
   async aiSend(){
-    const box = document.getElementById("ai-in"), text = (box ? box.value : "").trim();
-    if (!text || S.aiBusy) return;
+    const box = document.getElementById("ai-in"), photo = S.aiPhoto || "";
+    let text = (box ? box.value : "").trim();
+    if ((!text && !photo) || S.aiBusy) return;
+    if (!text) text = "Please read this bill.";
     const last = S.ai[S.ai.length - 1];
     if (last && last.role === "assistant" && Array.isArray(last.content))
       last.content.filter(b => b.type === "tool_use").forEach(t => { if (!S.aiAct[t.id] || S.aiAct[t.id].s === "pending"){ S.aiAct[t.id] = { s:"cancelled" }; S.aiQueue.push({ type:"tool_result", tool_use_id:t.id, content:"The owner moved on without confirming. Nothing was saved." }); } });
     const queued = S.aiQueue.slice();
-    S.ai.push({ role:"user", content:[...queued, { type:"text", text }] }); S.aiQueue = []; S.aiDraft = ""; S.aiBusy = true; aiSave(); render(); scrollAi();
+    const userMsg = { role:"user", content:[...queued, ...(photo ? [{ type:"image", source:{ type:"base64", media_type:"image/jpeg", data:photo.split(",")[1] } }] : []), { type:"text", text }] };
+    S.ai.push(userMsg); S.aiQueue = []; S.aiDraft = ""; S.aiPhoto = ""; S.aiBusy = true; aiSave(); render(); scrollAi();
     try {
       const res = await aiCall();
       if (!(res.content || []).some(b => (b.type === "text" && String(b.text || "").trim()) || b.type === "tool_use")) throw new Error("The assistant sent an empty answer. Try again.");
+      userMsg.content = userMsg.content.map(b => b.type === "image" ? { type:"text", text:"[bill photo]" } : b);   // keep later requests small
       S.ai.push({ role:"assistant", content:res.content });
       (res.content || []).filter(b => b.type === "tool_use").forEach(t => { S.aiAct[t.id] = { s:"pending" }; });
     } catch(e){
       if (AI_HISTORY_ERROR.test(String(e && e.message))){   // the saved chat is out of step with what the API accepts: start fresh, keep the typed message
-        S.ai = []; S.aiAct = {}; S.aiQueue = []; S.aiDraft = text; S.aiBusy = false; aiSave(); render(); setErr("Chat reset after an error. Your saved data is safe."); return;
+        S.ai = []; S.aiAct = {}; S.aiQueue = []; S.aiDraft = text; S.aiPhoto = photo; S.aiBusy = false; aiSave(); render(); setErr("Chat reset after an error. Your saved data is safe."); return;
       }
-      S.ai.pop(); S.aiQueue = queued; S.aiDraft = text; S.aiBusy = false; aiSave(); render(); setErr(e.message || "The assistant didn't answer. Try again."); return;
+      S.ai.pop(); S.aiQueue = queued; S.aiDraft = text; S.aiPhoto = photo; S.aiBusy = false; aiSave(); render(); setErr(e.message || "The assistant didn't answer. Try again."); return;
     }
     S.aiBusy = false; aiSave(); render(); scrollAi();
   },
@@ -1902,6 +1952,12 @@ document.addEventListener("keydown", e => {
   if (e.target.id === "ai-in" && e.key === "Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); ACTIONS.aiSend(); }
 });
 document.addEventListener("change", e => {
+  if (e.target.id === "ai-file"){
+    const file = e.target.files && e.target.files[0]; if (!file) return;
+    toast("Preparing photo…");
+    billPhotoFromFile(file).then(data => { S.aiPhoto = data; render(); const t = document.getElementById("ai-in"); if (t) t.focus(); }).catch(err => toast(err.message));
+    return;
+  }
   if (e.target.id === "dash-date" && e.target.value){ S.dashDate = e.target.value; render(); return; }
   if (e.target.id === "b-date" && e.target.value){ S.bookDate = e.target.value; S.bookDraft = null; render(); }
   if (e.target.id === "b-shop"){ S.bookShop = e.target.value; S.bookDraft = null; render(); }
