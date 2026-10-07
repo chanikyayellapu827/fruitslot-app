@@ -224,7 +224,7 @@ function aiChat_(p){
   if (!apiKey) throw new Error("The assistant isn't set up yet. Add ANTHROPIC_API_KEY in Script properties.");
   const model = props.getProperty("AI_MODEL") || "claude-haiku-4-5-20251001";
   if (!Array.isArray(p.messages) || !p.messages.length) throw new Error("Empty message.");
-  const body = { model: model, max_tokens: 1024, system: String(p.system || "").slice(0, 120000), messages: p.messages.slice(-24), tools: Array.isArray(p.tools) ? p.tools.slice(0, 12) : [] };
+  const body = { model: model, max_tokens: 4096, system: String(p.system || "").slice(0, 120000), messages: p.messages.slice(-24), tools: Array.isArray(p.tools) ? p.tools.slice(0, 12) : [] };
   const res = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", {
     method: "post", contentType: "application/json", muteHttpExceptions: true,
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
