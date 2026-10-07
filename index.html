@@ -193,6 +193,13 @@ button.big{font-size:1.15rem;min-height:58px}
 .bk-result strong{font-size:2.6rem;line-height:1.1;color:var(--ok)}
 .bk-result.loss{background:color-mix(in srgb,var(--bad) 10%,var(--surface));border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
 .bk-result.loss strong{color:var(--bad)}
+.bk-opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.bk-opts button{min-height:68px;font-size:1.25rem;font-weight:700;border-radius:14px;border:2px solid var(--line);background:var(--surface);color:var(--ink);padding:0 8px}
+.bk-opts button.on{border-color:var(--leaf);background:var(--leaf);color:var(--surface)}
+.bk-order{font-size:1.35rem;line-height:1.5;font-weight:700;margin:0 0 6px}
+.bk-trow{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:1.02rem}
+.bk-trow:first-of-type{border-top:0}
+.bk-trow small{display:block;color:var(--muted);font-weight:400}
 .bk-sum{list-style:none;margin:0;padding:0}
 .bk-sum li{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line)}
 .bk-sum li.sub{border:0;padding-top:0;color:var(--muted);font-size:.9rem}
@@ -906,6 +913,9 @@ const blank = v => v === null || v === undefined || v === "";
 const unitShort = f => f.unit === "kg" || f.unit === "size" ? "kg" : f.unit === "piece" ? "pcs" : "box";
 const netOf = f => Number(f.trayNet) || Number(f.trayQty) || 1;
 const sellOf = f => Number(f.trayQty) > 0 ? Number(f.trayQty) : netOf(f);   // cost per kg divides by sellable; falls back to net weight
+/* A day's entry remembers the net weight and wastage it was bought with (old entries don't, so they use the fruit's current values). */
+const netFor = (f, x) => num(x && x.trayNet) || netOf(f);
+const sellFor = (f, x) => num(x && x.trayNet) > 0 ? r2(num(x.trayNet) * (1 - (blank(x.wastePct) ? Number(f.wastePct) || 0 : num(x.wastePct)) / 100)) : sellOf(f);
 const bookRow = (shop, date) => S.book.find(r => r.shop === shop && r.date === date);
 function prevClose(shop, date, fid){
   const rows = S.book.filter(r => r.shop === shop && r.date < date && r.fruits && r.fruits[fid]).sort((a, b) => a.date < b.date ? 1 : -1);
@@ -921,6 +931,8 @@ function makeDraft(shop, date){
     const x = d.fruits[f.id] || (d.fruits[f.id] = {});
     if (x.open === undefined) x.open = prevClose(shop, date, f.id);
     if (blank(x.trayCost)) x.trayCost = f.trayCost || null;
+    if (blank(x.trayNet)) x.trayNet = netOf(f);
+    if (blank(x.wastePct)) x.wastePct = Number(f.wastePct) || 0;
   });
   return d;
 }
@@ -931,7 +943,7 @@ function calcShop(d){
   const out = { lines:[], cost:0, wasteCost:0, spent:0, missingCost:[], uncounted:[], noOpen:[], negative:[] };
   allFruits().forEach(f => {
     const x = d.fruits && d.fruits[f.id]; if (!x) return;
-    const net = netOf(f), trays = num(x.trays), tc = num(x.trayCost);
+    const net = netFor(f, x), sell = sellFor(f, x), trays = num(x.trays), tc = num(x.trayCost);
     if (blank(x.open) && trays === 0 && blank(x.close)) return;
     const avail = r1(num(x.open) + trays * net);
     if (avail === 0 && blank(x.close) && !num(x.waste)) return;
@@ -939,7 +951,7 @@ function calcShop(d){
     if (blank(x.open)) out.noOpen.push(f.name);
     if (blank(x.close)){ out.uncounted.push(f.name); out.lines.push({ f, avail, counted:false }); return; }
     const close = num(x.close), waste = num(x.waste), sold = r1(avail - close - waste);
-    const sell = sellOf(f), cpu = tc > 0 ? tc / sell : 0;
+    const cpu = tc > 0 ? tc / sell : 0;
     if (!(tc > 0) && (sold > 0 || waste > 0)) out.missingCost.push(f.name);
     if (sold < 0) out.negative.push(f.name);
     const lineCost = Math.round(Math.max(sold, 0) * cpu), lineWaste = Math.round(waste * cpu);   // round each line so totals add up exactly
@@ -954,16 +966,63 @@ function calcShop(d){
   return out;
 }
 const vIn = v => blank(v) ? "" : esc(v);
+const bkHad = (d, f) => { const x = d.fruits[f.id] || {}; return r1(num(x.open) + num(x.trays) * netFor(f, x)); };
+const bkInStock = d => S.fruits.filter(f => { const x = d.fruits[f.id]; return x && (bkHad(d, f) > 0 || blank(x.open) && num(x.trays) > 0); });
+const addDay = (ds, n) => { const [y, m, dd] = ds.split("-").map(Number); return ymd(new Date(y, m - 1, dd + n)); };
+const weekdayOf = ds => { const [y, m, dd] = ds.split("-").map(Number); return new Date(y, m - 1, dd).getDay(); };
+/* Night: money in versus the value of today's stock at shop prices */
+function nightStats(d){
+  const value = bkInStock(d).reduce((n, f) => n + bkHad(d, f) * (Number(f.storePrice) || Number(f.price) || 0), 0);
+  const money = num(d.cash) + num(d.upi) + appSales(d.shop, d.date);
+  return { value:Math.round(value), money:Math.round(money), pct: value > 0 ? Math.min(100, Math.round(money / value * 100)) : 0, more: Math.max(0, Math.round(value - money)), frac: value > 0 ? Math.min(1, money / value) : 0 };
+}
+const BK_LEFT = [0, 0.25, 0.5, 0.75];   // All sold, 1/4, 1/2, 3/4 left
+function bkPreLeft(ns, had){   // money is split over fruits by stock value, so every fruit sold the same share; pick the nearest button
+  const left = 1 - ns.frac, k = BK_LEFT.reduce((best, v) => Math.abs(v - left) < Math.abs(best - left) ? v : best, BK_LEFT[0]);
+  return r1(had * k);
+}
+/* Tomorrow: counter sales from past days plus app pre-orders */
+function tomorrowPlan(d){
+  const tomorrow = addDay(d.date, 1);
+  const days = S.book.filter(r => r.shop === d.shop && r.date < d.date).concat([d]).map(r => ({ date:r.date, c:calcShop(r) }))
+    .filter(x => x.c.cash + x.c.upi > 0).sort((x, y) => x.date < y.date ? 1 : -1);
+  const recent = days.slice(0, 3);
+  const sameDay = days.filter(x => x.date < d.date && weekdayOf(x.date) === weekdayOf(tomorrow)).slice(0, 4);
+  const useSame = sameDay.length >= 2;
+  const avg = (list, fn) => list.length ? list.reduce((n, x) => n + fn(x), 0) / list.length : 0;
+  const mix = fn => recent.length ? (useSame ? (avg(recent, fn) + avg(sameDay, fn)) / 2 : avg(recent, fn)) : 0;
+  const soldKg = f => x => { const l = x.c.lines.find(z => z.counted && z.f.id === f.id); return l ? Math.max(l.sold, 0) : null; };
+  const kgAvg = (list, f) => { const v = list.map(soldKg(f)).filter(z => z !== null); return v.length ? v.reduce((n, z) => n + z, 0) / v.length : 0; };
+  const orders = S.ownerOrders.filter(o => o.shop === d.shop && String(o.pickupDate).slice(0, 10) === tomorrow && o.status !== "rejected");
+  const pre = {}; orders.forEach(o => (o.items || []).forEach(i => { const e = pre[i.id] || (pre[i.id] = { kg:0, money:0 }); e.kg += i.size ? Number(i.kg) || 0 : Number(i.qty) || 0; e.money += (Number(i.qty) * Number(i.price)) || 0; }));
+  const counterMoney = Math.round(mix(x => x.c.cash + x.c.upi)), preMoney = Math.round(orders.reduce((n, o) => n + Number(o.total || 0), 0));
+  const rows = S.fruits.filter(f => f.active || (pre[f.id] && pre[f.id].kg > 0)).map(f => {
+    const price = Number(f.storePrice) || Number(f.price) || 0, p = pre[f.id] || { kg:0, money:0 };
+    const counterKg = r1(recent.length ? (useSame ? (kgAvg(recent, f) + kgAvg(sameDay, f)) / 2 : kgAvg(recent, f)) : 0), preKg = r1(p.kg);
+    const left = num((d.fruits[f.id] || {}).close), sell = sellOf(f), need = counterKg + preKg - left;
+    return { f, counterKg, preKg, left, rupees:Math.round(counterKg * price + p.money), need, sell, trays: need > 0 ? Math.ceil(r2(need / sell)) : 0 };
+  });
+  return { tomorrow, counterMoney, preMoney, totalMoney:counterMoney + preMoney, rows, recentN:recent.length, sameN: useSame ? sameDay.length : 0 };
+}
+const trayWord = (f, n) => (isSize(f) ? "lot" : "tray") + (n === 1 ? "" : "s");
+const orderLines = plan => plan.rows.filter(r => r.trays > 0).map(r => `${r.f.name} ${r.trays} ${trayWord(r.f, r.trays)}`);
+/* Daily book screens: step 2 = money, % sold, one screen per fruit; step 3 = tomorrow estimate, order list */
+const bkSeq = (step, d) => step === 2 ? ["money", "pct", ...bkInStock(d).map(f => "f:" + f.id)] : step === 3 ? ["est", "order"] : [""];
+const bkSubNow = (step, d) => { const q = bkSeq(step, d); return q.includes(S.bookSub) ? S.bookSub : q[0]; };
 function ownerBookHtml(){
   if (!S.bookDraft || S.bookDraft.date !== S.bookDate || S.bookDraft.shop !== S.bookShop) S.bookDraft = makeDraft(S.bookShop, S.bookDate);
   const d = S.bookDraft, step = S.bookStep || 1;
   const today = ymd(ist()), yd = (() => { const t = ist(); t.setDate(t.getDate() - 1); return ymd(t); })();
+  const inStock = bkInStock(d), seq = bkSeq(step, d), sub = bkSubNow(step, d), subIdx = seq.indexOf(sub), ns = nightStats(d);
+  if (step === 2 && sub.startsWith("f:")){   // an unanswered fruit starts with the estimate selected
+    const f = fruitById(sub.slice(2)), x = f && d.fruits[f.id];
+    if (x && blank(x.close)){ x.close = bkPreLeft(ns, bkHad(d, f)); LS.set("fs_bkdraft", d); }
+  }
   const c = calcShop(d);
-  const hadOf = f => r1(num(d.fruits[f.id].open) + num(d.fruits[f.id].trays) * netOf(f));
-  const inStock = S.fruits.filter(f => hadOf(f) > 0 || blank(d.fruits[f.id].open) && num(d.fruits[f.id].trays) > 0);
+  const hadOf = f => bkHad(d, f);
   const counted = inStock.filter(f => !blank(d.fruits[f.id].close)).length;
-  const done = { 1: !!d.morningDone, 2: inStock.length > 0 && counted === inStock.length, 3: !blank(d.cash) && !blank(d.upi), 4: c.complete };
-  const steps = [[1, "Morning", "Fruit bought"], [2, "Night", "Count stock"], [3, "Night", "Money"], [4, "Result", "Today's profit"]];
+  const done = { 1: !!d.morningDone, 2: !blank(d.cash) && !blank(d.upi) && counted === inStock.length, 3: !!(S.bkSeen || {})[d.shop + d.date], 4: c.complete };
+  const steps = [[1, "Morning", "Fruit bought"], [2, "Night", "Money and stock"], [3, "Tomorrow", "Estimate and order"], [4, "Result", "Today's profit"]];
   const saved = bookRow(d.shop, d.date);
 
   const top = `<div class="bk-pick">
@@ -994,40 +1053,69 @@ function ownerBookHtml(){
         <span class="stepper"><button data-act="bkTray" data-id="${f.id}" data-arg="-1" aria-label="One ${word} less">−</button><output>${r1(t)}</output><button data-act="bkTray" data-id="${f.id}" data-arg="1" aria-label="One ${word} more">+</button></span></div>
       ${t > 0 ? `<div class="bk-line"><span>Cost per ${word}, with transport</span>
         <span class="bk-num"><em>₹</em><input class="in" type="number" min="0" inputmode="numeric" data-bk="f:${f.id}:trayCost" value="${vIn(x.trayCost)}" placeholder="0"></span></div>
-        <p class="bk-hint">Adds ${fmtQty(t * netOf(f), f.unit)} to the shop${num(x.trayCost) ? `, cost ${rupee(t * num(x.trayCost))}` : ""}.</p>` : ""}
+        <div class="bk-line"><span>${isSize(f) ? "Lot" : "Tray"} net weight</span>
+        <span class="bk-num"><input class="in" type="number" min="0" step="0.5" inputmode="decimal" data-bk="f:${f.id}:trayNet" value="${vIn(x.trayNet)}" placeholder="?"><em>${unitShort(f)}</em></span></div>
+        <p class="bk-hint">Adds ${fmtQty(t * netFor(f, x), f.unit)} to the shop${num(x.trayCost) ? `, cost ${rupee(t * num(x.trayCost))}` : ""}. Prices will use this cost and weight.</p>` : ""}
     </div>`; };
     body = `<p class="bk-say">Tap <b>+</b> for each ${"tray"} you bought today. Check what was left from last night.</p>
       ${main.map(item).join("") || `<p class="empty">Nothing in the shop yet. Open the list below to add what you bought.</p>`}
       ${rest.length ? `<details class="bk-more" ${S.bkMoreOpen ? "open" : ""} id="bk-more"><summary>Bought another fruit? Show all fruits (${rest.length})</summary>${rest.map(item).join("")}</details>` : ""}
       <p class="bk-hint">Total paid for fruit today: <strong>${rupee(c.spent)}</strong></p>`;
-  } else if (step === 2){
-    body = !inStock.length ? `<p class="empty">No fruit in the shop for this day. Fill in the morning step first.</p>` : `
-      <p class="bk-say">Weigh or count what's left in the shop, and what you threw away today.</p>
-      <p class="bk-progress"><span style="width:${Math.round(counted / inStock.length * 100)}%"></span></p>
-      <p class="note" id="bk-count" style="margin:-4px 0 10px">Counted ${counted} of ${inStock.length}</p>
-      ${inStock.map(f => { const x = d.fruits[f.id]; return `<div class="bk-item ${blank(x.close) ? "" : "ok"}">
-        <div class="bk-head">${fruitIcon(f)}<strong>${esc(f.name)}</strong><span class="bk-had">You had <b>${fmtQty(hadOf(f), f.unit)}</b></span></div>
-        <div class="bk-two">
-          <label>Left now<span class="bk-num"><input class="in" type="number" min="0" step="0.1" inputmode="decimal" data-bk="f:${f.id}:close" value="${vIn(x.close)}" placeholder="?"><em>${unitShort(f)}</em></span></label>
-          <label>Thrown away<span class="bk-num"><input class="in" type="number" min="0" step="0.1" inputmode="decimal" data-bk="f:${f.id}:waste" value="${vIn(x.waste)}" placeholder="0"><em>${unitShort(f)}</em></span></label>
-        </div>
-        <p class="bk-sold" data-sold="${f.id}">${soldText(f, x)}</p>
-      </div>`; }).join("")}`;
-  } else if (step === 3){
+  } else if (step === 2 && sub === "money"){
     const app = appSales(d.shop, d.date);
     body = `<p class="bk-say">Count the money from <b>shop sales</b> today.</p>
       <div class="bk-item"><label class="bk-big">Cash in the drawer<span class="bk-num"><em>₹</em><input class="in" type="number" min="0" inputmode="numeric" data-bk="m:cash" value="${vIn(d.cash)}" placeholder="0"></span></label></div>
       <div class="bk-item"><label class="bk-big">UPI received at the counter<span class="bk-num"><em>₹</em><input class="in" type="number" min="0" inputmode="numeric" data-bk="m:upi" value="${vIn(d.upi)}" placeholder="0"></span></label>
         <p class="bk-hint">Don't include app orders. ${app ? `App orders picked up here today (${rupee(app)}) are added for you.` : "App orders are added for you."}</p></div>
-      <div class="bk-item"><label class="bk-big">Other costs today<span class="bk-num"><em>₹</em><input class="in" type="number" min="0" inputmode="numeric" data-bk="m:expenses" value="${vIn(d.expenses)}" placeholder="0"></span></label>
+      <div class="bk-item"><label class="bk-big">Other costs today (if any)<span class="bk-num"><em>₹</em><input class="in" type="number" min="0" inputmode="numeric" data-bk="m:expenses" value="${vIn(d.expenses)}" placeholder="0"></span></label>
         <p class="bk-hint">Bags, labour, tea, anything you paid for the shop. Transport is already in the tray cost.</p></div>`;
+  } else if (step === 2 && sub === "pct"){
+    body = !inStock.length ? `<p class="empty">No fruit in the shop for this day. Fill in the morning step first.</p>` : `
+      <div class="bk-result"><small>Estimated sold today</small><strong>${ns.pct}%</strong></div>
+      <div class="bk-item"><ul class="bk-sum">
+        <li><span>Money in</span><b>${rupee(ns.money)}</b></li>
+        <li><span>Today's stock at shop prices</span><b>${rupee(ns.value)}</b></li></ul></div>
+      <p class="bk-say" style="font-size:1.3rem">To sell everything you'd need <b>${rupee(ns.more)} more</b>.</p>
+      <p class="bk-hint">Next, say how much of each fruit is left. I'll start with a guess from this.</p>`;
+  } else if (step === 2){
+    const f = fruitById(sub.slice(2)), x = d.fruits[f.id], had = hadOf(f), fi = inStock.indexOf(f) + 1;
+    body = `<p class="bk-progress"><span style="width:${Math.round(fi / inStock.length * 100)}%"></span></p>
+      <p class="note" style="margin:-4px 0 10px">Fruit ${fi} of ${inStock.length}</p>
+      <div class="bk-item ${blank(x.close) ? "" : "ok"}">
+        <div class="bk-head">${fruitIcon(f)}<strong>${esc(f.name)}</strong></div>
+        <p class="bk-say">You had <b>${fmtQty(had, f.unit)}</b>. How much is left?</p>
+        <div class="bk-opts">${[["0", "All sold"], ["0.25", "1/4 left"], ["0.5", "1/2 left"], ["0.75", "3/4 left"]].map(([k, l]) =>
+          `<button class="${!blank(x.close) && Math.abs(num(x.close) - had * Number(k)) < 0.06 ? "on" : ""}" data-act="bkLeft" data-id="${f.id}" data-arg="${k}">${l}</button>`).join("")}</div>
+        <label class="bk-big">Or type how much is left<span class="bk-num"><input class="in" type="number" min="0" step="0.1" inputmode="decimal" data-bk="f:${f.id}:close" value="${vIn(x.close)}" placeholder="?"><em>${unitShort(f)}</em></span></label>
+        <label class="bk-big" style="margin-top:10px">Thrown away, if any<span class="bk-num"><input class="in" type="number" min="0" step="0.1" inputmode="decimal" data-bk="f:${f.id}:waste" value="${vIn(x.waste)}" placeholder="0"><em>${unitShort(f)}</em></span></label>
+        <p class="bk-sold" data-sold="${f.id}">${soldText(f, x)}</p>
+      </div>`;
+  } else if (step === 3){
+    const plan = tomorrowPlan(d);
+    if (sub === "est"){
+      body = `<div class="bk-result"><small>Expected tomorrow, ${niceDate(plan.tomorrow)}</small><strong>${rupee(plan.totalMoney)}</strong></div>
+        <div class="bk-item"><ul class="bk-sum">
+          <li><span>Counter sales</span><b>${rupee(plan.counterMoney)}</b></li>
+          <li><span>App pre-orders</span><b>${rupee(plan.preMoney)}</b></li></ul>
+          <p class="bk-hint">${plan.recentN ? `Counter sales: average of your last ${plan.recentN} recorded ${plan.recentN === 1 ? "day" : "days"}${plan.sameN ? `, mixed with the same weekday in ${plan.sameN} earlier weeks` : ""}.` : "No recorded days yet, so there is no counter estimate. Pre-orders are included."}</p></div>
+        ${plan.rows.some(r => r.counterKg > 0 || r.preKg > 0) ? `<div class="bk-item"><p class="lbl" style="margin:0 0 6px">Per fruit</p>${plan.rows.filter(r => r.counterKg > 0 || r.preKg > 0).map(r =>
+          `<div class="bk-trow"><span><strong>${esc(r.f.name)}</strong><small>Counter ${fmtQty(r.counterKg, r.f.unit)}${r.preKg ? `, pre-orders ${fmtQty(r.preKg, r.f.unit)}` : ""}</small></span><b>${rupee(r.rupees)}</b></div>`).join("")}</div>` : ""}`;
+    } else {
+      const lines = orderLines(plan);
+      body = `<p class="bk-say">Suggested order for <b>${niceDate(plan.tomorrow)}</b>:</p>
+        <div class="bk-item">${lines.length ? `<p class="bk-order">Order: ${esc(lines.join(", "))}</p>` : `<p class="bk-order">Nothing to order.</p>`}
+          ${lines.length ? `<button class="primary wide" data-act="bkShare">Share on WhatsApp</button>` : ""}</div>
+        ${plan.rows.filter(r => r.counterKg > 0 || r.preKg > 0 || r.left > 0).map(r =>
+          `<div class="bk-trow"><span><strong>${esc(r.f.name)}</strong><small>${r1(r.counterKg)} expected + ${r1(r.preKg)} pre-orders − ${r1(r.left)} left, ÷ ${r2(r.sell)} per ${isSize(r.f) ? "lot" : "tray"}</small></span><b>${r.trays} ${trayWord(r.f, r.trays)}</b></div>`).join("")}`;
+    }
   } else {
     const warn = [];
-    if (c.noOpen.length) warn.push([1, `Morning: enter what was in the shop for ${c.noOpen.join(", ")}.`]);
-    if (c.uncounted.length) warn.push([2, `Night count missing for ${c.uncounted.join(", ")}.`]);
-    if (c.negative.length) warn.push([2, `Check ${c.negative.join(", ")}: more is left than you had.`]);
-    if (blank(d.cash) || blank(d.upi)) warn.push([3, "Money: enter cash and counter UPI."]);
-    if (c.missingCost.length) warn.push([1, `Morning: add the tray cost for ${c.missingCost.join(", ")}.`]);
+    const firstUncounted = inStock.find(f => blank(d.fruits[f.id].close)), firstNeg = c.negative.length && S.fruits.find(f => f.name === c.negative[0]);
+    if (c.noOpen.length) warn.push([1, "", `Morning: enter what was in the shop for ${c.noOpen.join(", ")}.`]);
+    if (c.uncounted.length) warn.push([2, firstUncounted ? "f:" + firstUncounted.id : "pct", `Night count missing for ${c.uncounted.join(", ")}.`]);
+    if (c.negative.length) warn.push([2, firstNeg ? "f:" + firstNeg.id : "pct", `Check ${c.negative.join(", ")}: more is left than you had.`]);
+    if (blank(d.cash) || blank(d.upi)) warn.push([2, "money", "Money: enter cash and counter UPI."]);
+    if (c.missingCost.length) warn.push([1, "", `Morning: add the tray cost for ${c.missingCost.join(", ")}.`]);
     const sold = c.lines.filter(l => l.counted && (l.sold > 0 || l.waste > 0));
     body = `<div class="bk-result ${c.profit < 0 ? "loss" : ""}">
         <small>${c.complete ? (c.profit < 0 ? "Loss today" : "Profit today") : "Profit so far"}</small>
@@ -1049,16 +1137,32 @@ function ownerBookHtml(){
           <p>Cost per ${u}: ${l.tc ? rupee(l.tc) : "₹0"} per ${word} ÷ ${r2(l.sell)} ${u} sellable = <b>${rupee2(l.cpu)}</b>${l.tc ? "" : ` <span class="bad">(add the ${word} cost on the Morning step)</span>`}</p>
           <p>Sold cost: ${r1(Math.max(l.sold, 0))} × ${rupee2(l.cpu)} = <b>${rupee(l.lineCost)}</b>${l.waste ? `<br>Thrown cost: ${r1(l.waste)} × ${rupee2(l.cpu)} = <b class="bad">${rupee(l.lineWaste)}</b> (${l.wastePct}% wasted)` : ""}</p>
         </div>`; }).join("")}</div>` : ""}
-      ${warn.map(([n, w]) => `<button class="bk-warn" data-act="bkStep" data-id="${n}">${esc(w)} <u>Fix</u></button>`).join("")}`;
+      ${warn.map(([n, arg, w]) => `<button class="bk-warn" data-act="bkStep" data-id="${n}" data-arg="${esc(arg)}">${esc(w)} <u>Fix</u></button>`).join("")}`;
   }
-  const next = step < 4 ? `<button class="primary" data-act="bkNext">Save and next</button>` : `<button class="primary" data-act="bkNext">Save</button>`;
+  const lastSub = subIdx >= seq.length - 1;
+  const nextLabel = step === 4 ? "Save" : step === 1 ? "Save and next" : step === 2 ? (lastSub ? "Save and next" : "Next") : (lastSub ? "Done" : "Next");
   return `${top}<div class="bk-body">${body}</div>
     <p class="err" id="err" role="alert"></p>
-    <div class="bar"><div class="bar-in">${step > 1 ? `<button class="ghost bk-back" data-act="bkStep" data-id="${step - 1}">Back</button>` : `<span></span>`}${next}</div></div>`;
+    <div class="bar"><div class="bar-in">${step > 1 || subIdx > 0 ? `<button class="ghost bk-back" data-act="bkBack">Back</button>` : `<span></span>`}<button class="primary" data-act="bkNext">${nextLabel}</button></div></div>`;
+}
+/* Morning step: today's tray cost and net weight go into Prices (and prices are saved). Other days are left alone. */
+async function syncPricesFromBook(d){
+  if (d.date !== ymd(ist())) return;
+  const list = JSON.parse(JSON.stringify(S.fruits)); let changed = false;
+  list.forEach(f => {
+    const x = d.fruits[f.id]; if (!x || !(num(x.trays) > 0)) return;
+    const cost = num(x.trayCost), net = num(x.trayNet), before = f.trayCost + "|" + f.trayNet;
+    if (cost > 0) f.trayCost = cost;
+    if (net > 0) f.trayNet = net;
+    if (before !== f.trayCost + "|" + f.trayNet){ applyAuto(f); changed = true; }
+  });
+  if (!changed) return;
+  try { setFruits(await api.saveFruits(S.ownerKey, list.concat(S.goneFruits))); S.editFruits = null; toast("Prices updated from today's tray cost"); }
+  catch(e){ toast("The book is saved, but prices were not updated: " + (e.message || "try again from Prices")); }
 }
 function soldText(f, x){
   if (blank(x.close)) return "";
-  const had = r1(num(x.open) + num(x.trays) * netOf(f)), sold = r1(had - num(x.close) - num(x.waste));
+  const had = r1(num(x.open) + num(x.trays) * netFor(f, x)), sold = r1(had - num(x.close) - num(x.waste));
   if (sold < 0) return `<span class="bad">That's more than you had. Check the numbers.</span>`;
   return `Sold <b>${fmtQty(sold, f.unit)}</b>`;
 }
@@ -1715,7 +1819,7 @@ const ACTIONS = {
     }
   },
   ownerLogout(){ S.ownerKey = ""; LS.set("fs_owner", ""); S.ownerOrders = []; S.editFruits = null; S.view = "shop"; render(); },
-  ownerTab(tab){ S.ownerTab = tab; if (tab === "book") S.bookStep = ist().getHours() >= 16 ? 2 : 1; if (tab === "fruits"){ S.editFruits = null; S.editOpen = null; } if (tab === "book") S.bookDraft = null; render(); },
+  ownerTab(tab){ S.ownerTab = tab; if (tab === "book"){ S.bookStep = ist().getHours() >= 16 ? 2 : 1; S.bookSub = null; } if (tab === "fruits"){ S.editFruits = null; S.editOpen = null; } if (tab === "book") S.bookDraft = null; render(); },
   aiChip(_, text){ S.aiDraft = text; render(); const t = document.getElementById("ai-in"); if (t){ t.focus(); t.setSelectionRange(t.value.length, t.value.length); } },
   aiReset(){ S.ai = []; S.aiAct = {}; S.aiQueue = []; S.aiDraft = ""; S.aiPhoto = ""; aiSave(); render(); },
   async aiConfirm(i, _, btn){
@@ -1782,7 +1886,7 @@ const ACTIONS = {
   },
   dashDays(n){ S.dashDays = Number(n); render(); },
   dashDay(ds){ S.dashDate = ds; render(); const el = document.getElementById("dash-day"); if (el) el.scrollIntoView({ behavior:"smooth", block:"start" }); },
-  openBook(shop, ds){ S.bookShop = shop; S.bookDate = ds; S.bookDraft = null; S.ownerTab = "book"; S.bookStep = 4; render(); window.scrollTo(0, 0); },
+  openBook(shop, ds){ S.bookShop = shop; S.bookDate = ds; S.bookDraft = null; S.ownerTab = "book"; S.bookStep = 4; S.bookSub = null; render(); window.scrollTo(0, 0); },
   clearSample(){ S.book = S.book.filter(r => !r.sample); LS.set("fs_book", S.book); render(); toast("Sample data cleared"); },
   async sampleData(){
     if (REMOTE()) return;
@@ -1790,7 +1894,18 @@ const ACTIONS = {
   },
   bkShop(id){ S.bookShop = id; S.bookDraft = null; render(); },
   bkDay(id){ S.bookDate = id; S.bookDraft = null; render(); },
-  bkStep(n){ S.bookStep = Number(n); render(); window.scrollTo(0, 0); },
+  bkStep(n, arg){ S.bookStep = Number(n); S.bookSub = arg || null; render(); window.scrollTo(0, 0); },
+  bkBack(){
+    const d = S.bookDraft, step = S.bookStep || 1, q = bkSeq(step, d), i = q.indexOf(bkSubNow(step, d));
+    if (i > 0) S.bookSub = q[i - 1]; else if (step > 1){ S.bookStep = step - 1; const pq = bkSeq(step - 1, d); S.bookSub = pq[pq.length - 1]; }
+    render(); window.scrollTo(0, 0);
+  },
+  bkLeft(fid, k){ const f = fruitById(fid), x = S.bookDraft.fruits[fid]; x.close = r1(bkHad(S.bookDraft, f) * Number(k)); LS.set("fs_bkdraft", S.bookDraft); render(); },
+  bkShare(){
+    const d = S.bookDraft, plan = tomorrowPlan(d), lines = orderLines(plan); if (!lines.length) return;
+    const text = `Fruit order for ${shopShort(d.shop)}, ${niceDate(plan.tomorrow)}:\n${lines.join("\n")}`;
+    window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank", "noopener");
+  },
   bkTray(fid, delta){
     const x = S.bookDraft.fruits[fid]; x.trays = Math.max(0, r1(num(x.trays) + Number(delta)));
     if (x.trays > 0 && blank(x.trayCost)) x.trayCost = (fruitById(fid) || {}).trayCost || null;
@@ -1798,9 +1913,18 @@ const ACTIONS = {
     LS.set("fs_bkdraft", S.bookDraft); render();
   },
   async bkNext(_, __, btn){
-    if ((S.bookStep || 1) === 1) S.bookDraft.morningDone = true;
-    const ok = await ACTIONS.saveBook(_, __, btn, true);
-    if (ok && (S.bookStep || 1) < 4){ S.bookStep = (S.bookStep || 1) + 1; render(); window.scrollTo(0, 0); }
+    const d = S.bookDraft, step = S.bookStep || 1, q = bkSeq(step, d), i = q.indexOf(bkSubNow(step, d)), last = i >= q.length - 1;
+    const go = (st, sub) => { S.bookStep = st; S.bookSub = sub; render(); window.scrollTo(0, 0); };
+    if (step === 1){
+      d.morningDone = true; const snap = JSON.parse(JSON.stringify(d));
+      if (await ACTIONS.saveBook(_, __, btn, true)){ go(2, null); await syncPricesFromBook(snap); }
+    } else if (step === 2){
+      if (!last){ LS.set("fs_bkdraft", d); go(2, q[i + 1]); }
+      else if (await ACTIONS.saveBook(_, __, btn, true)) go(3, null);
+    } else if (step === 3){
+      if (!last){ go(3, q[i + 1]); }
+      else { (S.bkSeen = S.bkSeen || {})[d.shop + d.date] = true; go(4, null); }
+    } else await ACTIONS.saveBook(_, __, btn, true);
   },
   async saveBook(_, __, btn, quiet){
     const d = JSON.parse(JSON.stringify(S.bookDraft));
@@ -1949,6 +2073,7 @@ document.addEventListener("input", e => {
     const f = fruitById(parts[1]), x = S.bookDraft.fruits[parts[1]];
     const sold = document.querySelector(`[data-sold="${CSS.escape(parts[1])}"]`); if (sold) sold.innerHTML = soldText(f, x);
     if (parts[2] === "close"){
+      document.querySelectorAll(".bk-opts button").forEach(b => b.classList.toggle("on", !blank(x.close) && Math.abs(num(x.close) - bkHad(S.bookDraft, f) * Number(b.dataset.arg)) < 0.06));
       el.closest(".bk-item").classList.toggle("ok", !blank(x.close));
       const items = document.querySelectorAll(".bk-body [data-sold]"), n = items.length;
       const c = [...items].filter(i => !blank(S.bookDraft.fruits[i.dataset.sold].close)).length;
