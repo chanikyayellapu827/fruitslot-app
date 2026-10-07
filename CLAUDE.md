@@ -32,8 +32,8 @@ FruitSlot is a fruit pre-order and shop management PWA for two shops in Eluru: *
 - App price = cost per kg x (1 + profit%), rounded up (round to 2 decimals first).
 - Shop price = app price + shop %.
 - Example: net 18, cost 3250 → sellable 16.56 kg → ₹196.26/kg → app ₹212 → shop ₹234.
-- Daily book cost per kg uses tray cost ÷ sellable per tray (the same cost per kg).
-- The Daily book, Dashboard, Result and the AI assistant all use these rules.
+- Daily book cost per kg = tray cost ÷ tray net weight (not sellable). This applies to the Daily book, Dashboard, Result and the AI assistant, and the Result workings show e.g. "÷ 17.375 kg net". Selling prices (app and shop) still come from sellable kg.
+- The Daily book, Dashboard, Result and the AI assistant use these rules for prices, and the net-weight cost per kg above for costs.
 
 ## Daily book
 
