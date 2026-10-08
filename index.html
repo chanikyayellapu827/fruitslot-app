@@ -247,7 +247,9 @@ button.big{font-size:1.15rem;min-height:58px}
 .bk-seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px}
 .bk-seg button,.bk-date{flex:1;border:0;background:none;border-radius:9px;min-height:44px;font-weight:600;color:var(--muted);display:flex;align-items:center;justify-content:center;position:relative;font-size:.98rem}
 .bk-seg .on{background:var(--leaf);color:var(--surface)}
-.bk-date input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}
+.bk-dateIn{display:block;width:100%;min-height:44px;margin-top:8px}
+.dpick-in{display:block;min-height:44px;margin-top:8px}
+.dpickbtn{background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--leaf);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .bk-for{margin:10px 0 8px}
 .bk-for .note{margin-left:6px}
 .bk-steps{list-style:none;padding:0;margin:0 0 14px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
@@ -384,8 +386,6 @@ button.big{font-size:1.15rem;min-height:58px}
 .hb{display:block;height:10px;border-radius:99px;background:var(--bg);overflow:hidden}
 .hb i{display:block;height:100%;border-radius:99px}
 .hb .pos{background:var(--ok)} .hb .neg{background:var(--bad)} .hb .warn{background:var(--tag)}
-.dpick{position:relative;font-weight:600;color:var(--leaf);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
-.dpick input{position:absolute;inset:0;opacity:0;width:100%}
 .dayshop{border-top:1px dashed var(--line);padding:8px 0}
 .dayshop:first-of-type{border-top:0}
 .dayshop p{display:flex;justify-content:space-between;gap:8px;margin:2px 0}
@@ -528,7 +528,7 @@ body[data-view="owner"] .toast{bottom:calc(var(--tabh) + 84px + env(safe-area-in
 .empty{overflow-wrap:anywhere}
 .foot{margin-top:var(--s6);align-items:flex-start;flex-direction:row;flex-wrap:wrap;gap:var(--s3);align-items:center}
 /* touch targets: every control is at least 44px */
-button,.link,select,.in,.choice,summary,.switch,.filebtn,.xbtn,.sw,.swb,.dpick,.bk-date{min-height:var(--touch)}
+button,.link,select,.in,.choice,summary,.switch,.filebtn,.xbtn,.sw,.swb,.dpickbtn,.bk-seg button{min-height:var(--touch)}
 .stepper button,.ibtn,.langsw button{min-height:var(--touch)}
 .xbtn,.swb,.ai-x{min-width:var(--touch)}
 .swb{width:var(--touch);height:var(--touch);border-width:4px;background-clip:content-box;padding:5px}
@@ -958,7 +958,7 @@ const S = {
   editOpen:null, newPhoto:"", addOpen:false,
   ai: LS.get("fs_ai", []), aiAct: LS.get("fs_ai_act", {}), aiQueue: LS.get("fs_ai_q", []), aiBusy:false, aiDraft:"", dashDays:7, dashDate:"",
   bookStep:1, bkMoreOpen:false,
-  book:[], bookDate: ymd(ist()), bookShop:"1town", bookDraft:null
+  book:[], bookDate: ymd(ist()), bookShop:"1town", bookOther:false, dashPick:false, bookDraft:null
 };
 /* Prices tab: true while the owner has edits that are not saved yet. */
 const pricesDirty = () => !!(S.fruitsDirty && S.view === "owner" && S.ownerTab === "fruits" && S.editFruits);
@@ -1253,7 +1253,7 @@ function viewOwner(){
     <div class="topbtns"><button class="ibtn" data-act="go" data-id="shop" aria-label="Customer view" title="Customer view">${ico("store")}</button><button class="ibtn" data-act="refresh" aria-label="Refresh" title="Refresh">${ico("refresh")}</button><button class="ibtn" data-act="ownerLogout" aria-label="Log out" title="Log out">${ico("logout")}</button></div></header>
   ${tab === "ai" ? "" : `<h1 class="pagetitle">${titles[tab] || ""}</h1>`}
   ${tab === "orders" || tab === "trays" ? `<div class="filters">
-    <label>Pickup day<input class="in" type="date" id="o-date" value="${S.ownerDate}"></label>
+    <label>Pickup day<input class="in" type="date" id="o-date" value="${S.ownerDate}" data-pickable></label>
     ${tab === "orders" ? `<label>Shop<select class="in" id="o-shop"><option value="all">Both shops</option>${CONFIG.SHOPS.map(s => `<option value="${s.id}" ${S.ownerShop === s.id ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>` : ""}
   </div>` : ""}
   ${tab === "orders" ? ownerOrdersHtml() : tab === "trays" ? ownerTraysHtml() : tab === "book" ? ownerBookHtml() : tab === "ai" ? ownerAiHtml() : tab === "profit" ? ownerDashHtml() : ownerFruitsHtml()}
@@ -1447,13 +1447,15 @@ function ownerBookHtml(){
   const steps = [[1, "Morning", "Fruit bought"], [2, "Night", "Money and stock"], [3, "Tomorrow", "Estimate and order"], [4, "Result", isSupplied(d.shop) ? "Billed to brother" : "Today's profit"]];
   const saved = bookRow(d.shop, d.date);
 
+  const otherOn = S.bookOther || (S.bookDate !== today && S.bookDate !== yd);
   const top = `<div class="bk-pick">
       <div class="bk-seg" role="group" aria-label="Shop">${CONFIG.SHOPS.map(s => `<button class="${S.bookShop === s.id ? "on" : ""}" data-act="bkShop" data-id="${s.id}">${esc(s.name.replace(" Rythu Bazar", ""))}</button>`).join("")}</div>
       <div class="bk-seg" role="group" aria-label="Day">
-        <button class="${S.bookDate === today ? "on" : ""}" data-act="bkDay" data-id="${today}">Today</button>
-        <button class="${S.bookDate === yd ? "on" : ""}" data-act="bkDay" data-id="${yd}">Yesterday</button>
-        <label class="bk-date ${S.bookDate !== today && S.bookDate !== yd ? "on" : ""}">Other day<input type="date" id="b-date" value="${S.bookDate}"></label>
+        <button class="${!otherOn && S.bookDate === today ? "on" : ""}" data-act="bkDay" data-id="${today}">Today</button>
+        <button class="${!otherOn && S.bookDate === yd ? "on" : ""}" data-act="bkDay" data-id="${yd}">Yesterday</button>
+        <button class="${otherOn ? "on" : ""}" data-act="bkOther">Other day</button>
       </div>
+      ${otherOn ? `<input class="in bk-dateIn" type="date" id="b-date" value="${S.bookDate}" max="${today}" aria-label="Pick a day">` : ""}
     </div>
     <p class="bk-for">${esc(shopName(d.shop))}, <strong>${niceDate(d.date)}</strong> <span class="note">${saved ? "Saved" : "Not saved yet"}</span></p>
     <ol class="bk-steps">${steps.map(([n, a, b]) => `<li><button class="${step === n ? "on" : ""} ${done[n] ? "done" : ""}" data-act="bkStep" data-id="${n}">
@@ -2059,7 +2061,8 @@ function ownerDashHtml(){
   ${brotherHtml(periodBilled(dates))}
 
   <section class="dcard" id="dash-day"><div class="dhead"><h2>One day</h2>
-    <label class="dpick">${niceDate(detailDate)}<input type="date" id="dash-date" value="${detailDate}"></label></div>
+    <button class="dpickbtn" data-act="dashOther">${niceDate(detailDate)}</button></div>
+    ${S.dashPick ? `<input class="in dpick-in" type="date" id="dash-date" value="${detailDate}" aria-label="Pick a day">` : ""}
     ${CONFIG.SHOPS.map(s => { const r = bookRow(s.id, detailDate);
       if (!r) return `<div class="dayshop"><p><strong>${esc(s.name)}</strong><span class="note">No entry</span></p></div>`;
       const c = calcShop(r);
@@ -2432,7 +2435,9 @@ const ACTIONS = {
     S.book = makeSampleBook(); LS.set("fs_book", S.book); render(); toast("Sample data added on this phone. Clear it before real use.");
   },
   bkShop(id){ S.bookShop = id; S.bookDraft = null; render(); },
-  bkDay(id){ S.bookDate = id; S.bookDraft = null; render(); },
+  bkDay(id){ S.bookDate = id; S.bookOther = false; S.bookDraft = null; render(); },
+  bkOther(){ S.bookOther = true; render(); openPicker("b-date"); },
+  dashOther(){ S.dashPick = true; render(); openPicker("dash-date"); },
   bkStep(n, arg){ S.bookStep = Number(n); S.bookSub = arg || null; render(); window.scrollTo(0, 0); },
   bkBack(){
     const d = S.bookDraft, step = S.bookStep || 1, q = bkSeq(step, d), i = q.indexOf(bkSubNow(step, d));
@@ -2638,6 +2643,20 @@ document.addEventListener("input", e => {
 document.addEventListener("keydown", e => {
   if (e.target.id === "ai-in" && e.key === "Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); ACTIONS.aiSend(); }
 });
+function openPicker(id){
+  const el = document.getElementById(id); if (!el) return;
+  try { el.showPicker(); } catch (_) { try { el.focus(); el.click(); } catch (__) {} }
+}
+function onDatePick(e){
+  const t = e.target, v = t.value;
+  if (!v) return false;
+  if (t.id === "dash-date"){ S.dashDate = v; S.dashPick = false; render(); return true; }
+  if (t.id === "b-date"){ const today = ymd(ist()); if (v > today){ toast("Pick today or an earlier day"); t.value = S.bookDate; return true; }
+    if (v === S.bookDate) return true; S.bookDate = v; S.bookDraft = null; render(); return true; }
+  if (t.id === "o-date"){ if (v === S.ownerDate) return true; S.ownerDate = v; render(); return true; }
+  return false;
+}
+document.addEventListener("input", onDatePick);
 document.addEventListener("change", e => {
   if (e.target.id === "ai-file"){
     const file = e.target.files && e.target.files[0]; if (!file) return;
@@ -2645,10 +2664,8 @@ document.addEventListener("change", e => {
     billPhotoFromFile(file).then(data => { S.aiPhoto = data; render(); const t = document.getElementById("ai-in"); if (t) t.focus(); }).catch(err => toast(err.message));
     return;
   }
-  if (e.target.id === "dash-date" && e.target.value){ S.dashDate = e.target.value; render(); return; }
-  if (e.target.id === "b-date" && e.target.value){ S.bookDate = e.target.value; S.bookDraft = null; render(); }
+  if (onDatePick(e)) return;
   if (e.target.id === "b-shop"){ S.bookShop = e.target.value; S.bookDraft = null; render(); }
-  if (e.target.id === "o-date" && e.target.value){ S.ownerDate = e.target.value; render(); }
   if (e.target.id === "o-shop"){ S.ownerShop = e.target.value; render(); }
   if (e.target.dataset && e.target.dataset.photo && e.target.files && e.target.files[0]){
     const key = e.target.dataset.photo, file = e.target.files[0];
