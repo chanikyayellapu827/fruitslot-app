@@ -2656,7 +2656,9 @@ function onDatePick(e){
   if (t.id === "o-date"){ if (v === S.ownerDate) return true; S.ownerDate = v; render(); return true; }
   return false;
 }
-document.addEventListener("input", onDatePick);
+/* Re-rendering while the phone's date wheel is open would close it, so "input" only commits once the field is no longer focused; "change" and leaving the field commit it. */
+document.addEventListener("input", e => { if (e.target.type === "date" && e.target === document.activeElement) return; onDatePick(e); });
+document.addEventListener("focusout", e => { if (e.target.type === "date") onDatePick(e); });
 document.addEventListener("change", e => {
   if (e.target.id === "ai-file"){
     const file = e.target.files && e.target.files[0]; if (!file) return;
