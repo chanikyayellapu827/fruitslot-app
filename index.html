@@ -568,40 +568,45 @@ function photoPicker(key, photo){
     ${photo ? `<button class="ghost" data-act="removePhoto" data-id="${esc(key)}">Remove photo</button>` : ""}
   </div>`;
 }
-function toast(msg){ const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2200); }
+function toast(msg){ const t = document.getElementById("toast"); t.textContent = niceError(msg); t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2200); }
 
 /* ===== Data: demo (this phone) or Google Sheet ===== */
-/* retry = true: a web page / 404 instead of JSON is tried once more after 2 seconds. Only for saves that are safe to repeat. */
-async function remoteJson(request, retry){
-  try { return await remoteJsonOnce(request); }
-  catch(e){
-    if (!(retry && e.notJson)) throw e;
-    await new Promise(res => setTimeout(res, 2000));
-    return remoteJsonOnce(request);
+/* Errors shown to people are one short plain sentence: never raw JSON, web pages or technical text. */
+const BUSY_MSG = "The shop is busy right now. Try again in a moment.";
+function niceError(m, fb){
+  m = String(m == null ? "" : m).trim();
+  return !m || m.length > 140 || /<|DOCTYPE|[{}]|Exception|TypeError|ReferenceError|undefined|script\.google|https?:/i.test(m) ? (fb || "Something went wrong. Try again.") : m;
+}
+/* tries = how many extra attempts when the server is busy (web page / 404 / "too many times" / no answer), each after a short random wait. */
+async function remoteJson(request, tries){
+  for (let i = 0;; i++){
+    try { return await remoteJsonOnce(request); }
+    catch(e){
+      if (!(e && e.retryable) || i >= (tries || 0)) throw e;
+      await new Promise(res => setTimeout(res, 600 + Math.random() * 1400));
+    }
   }
 }
 async function remoteJsonOnce(request){
   let r, text;
-  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 90000);   // never leave the app waiting forever
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 45000);   // never leave the app waiting forever
+  const fail = (msg, retryable) => { const err = new Error(msg); err.retryable = !!retryable; return err; };
   try { r = await request(ctl.signal); text = await r.text(); }
-  catch(e){ throw new Error(e && e.name === "AbortError" ? "The shop server took too long to answer. Try again." : "Couldn't reach the shop server. Check your internet and try again."); }
+  catch(e){ throw fail(e && e.name === "AbortError" ? "The shop is slow right now. Try again." : "Couldn't reach the shop. Check your internet and try again.", true); }
   finally { clearTimeout(timer); }
   let j; try { j = JSON.parse(text); }
-  catch(e){
-    const page = (text.match(/<title[^>]*>([^<]*)/i) || [])[1] || text.replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ");
-    const what = page.replace(/\s+/g, " ").trim().slice(0, 120);
-    const err = new Error(`The shop server sent a web page instead of data (code ${r.status}${what ? `: "${what}"` : ""}). In Apps Script, deploy a new version with access set to Anyone, then try again.`);
-    err.notJson = true; throw err;
-  }
-  if (!j.ok) throw new Error(j.error || "Request failed"); return j.data;
+  catch(e){ console.warn("Server sent a web page, code " + r.status, String(text).slice(0, 200)); throw fail(BUSY_MSG, true); }
+  if (!j || !j.ok) throw fail(j && j.busy ? BUSY_MSG : niceError(j && j.error), !!(j && j.busy));
+  return j.data;
 }
-const remoteGet = params => remoteJson(signal => fetch(CONFIG.API_URL + "?" + new URLSearchParams(params), { signal }));
-const remotePost = (body, retry) => remoteJson(signal => fetch(CONFIG.API_URL, { method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify(body), signal }), retry);
+const remoteGet = (params, tries) => remoteJson(signal => fetch(CONFIG.API_URL + "?" + new URLSearchParams(params), { signal }), tries);
+const remotePost = (body, tries) => remoteJson(signal => fetch(CONFIG.API_URL, { method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify(body), signal }), tries);
 const REMOTE = () => !!CONFIG.API_URL;
 const api = {
-  async fruits(){ return REMOTE() ? remoteGet({ action:"fruits" }) : LS.get("fs_fruits", DEFAULT_FRUITS); },
+  async photos(){ return REMOTE() ? remoteGet({ action:"photos" }, 1) : {}; },
+  async fruits(){ return REMOTE() ? remoteGet({ action:"fruits" }, 1) : LS.get("fs_fruits", DEFAULT_FRUITS); },
   async placeOrder(p){
-    if (REMOTE()) return remotePost({ action:"order", ...p });
+    if (REMOTE()) return remotePost({ action:"order", ...p }, 2);
     const fruits = LS.get("fs_fruits", DEFAULT_FRUITS), orders = LS.get("fs_orders", []);
     const items = p.items.map(i => {
       const f = fruits.map(normFruit).find(x => x.id === i.id && x.active);
@@ -629,7 +634,7 @@ const api = {
     return LS.get("fs_orders", []);
   },
   async updateOrder(key, id, status){
-    if (REMOTE()) return remotePost({ action:"updateOrder", key, id, status }, true);
+    if (REMOTE()) return remotePost({ action:"updateOrder", key, id, status }, 1);
     if (key !== CONFIG.DEMO_OWNER_KEY) throw new Error("Wrong owner key.");
     const orders = LS.get("fs_orders", []), o = orders.find(x => x.id === id);
     if (!o) throw new Error("Order not found."); o.status = status; LS.set("fs_orders", orders); return o;
@@ -640,13 +645,13 @@ const api = {
     return LS.get("fs_book", []);
   },
   async saveBook(key, row){
-    if (REMOTE()) return remotePost({ action:"saveBook", key, row }, true);
+    if (REMOTE()) return remotePost({ action:"saveBook", key, row }, 1);
     if (key !== CONFIG.DEMO_OWNER_KEY) throw new Error("Wrong owner key.");
     const all = LS.get("fs_book", []).filter(r => !(r.date === row.date && r.shop === row.shop));
     all.push(row); LS.set("fs_book", all); return row;
   },
   async saveFruits(key, fruits){
-    if (REMOTE()) return remotePost({ action:"saveFruits", key, fruits }, true);
+    if (REMOTE()) return remotePost({ action:"saveFruits", key, fruits }, 1);
     if (key !== CONFIG.DEMO_OWNER_KEY) throw new Error("Wrong owner key.");
     LS.set("fs_fruits", fruits); return fruits;
   }
@@ -654,7 +659,7 @@ const api = {
 
 /* ===== State ===== */
 const S = {
-  view:"shop", lastView:"", fruits:[], goneFruits:[], cart:{}, loadError:"",
+  view:"shop", lastView:"", fruits:[], goneFruits:[], cart:{}, loadError:"", loading:false, photos:LS.get("fs_photos", null), photosReady:false,
   customer: LS.get("fs_me", { name:"", phone:"", shop:"" }),
   myOrders: LS.get("fs_my", []), mine:null, lastOrder:null,
   ownerKey: LS.get("fs_owner", ""), ownerTab:"orders", ownerOrders:[], ownerDate: pickupDate(), ownerShop:"all", editFruits:null,
@@ -676,7 +681,10 @@ const fruitById = id => S.fruits.find(f => f.id === id);
 /* Deleted fruits stay in the saved list (hidden) so old Daily book records and orders keep their name and numbers. */
 const fruitAny = id => fruitById(id) || (S.goneFruits || []).find(f => f.id === id);
 const allFruits = () => S.fruits.concat(S.goneFruits || []);
-function setFruits(list){ const all = list.map(normFruit); S.fruits = all.filter(f => !f.deleted); S.goneFruits = all.filter(f => f.deleted); }
+function setFruits(list){
+  const all = list.map(normFruit);
+  if (S.photos) all.forEach(f => { if (f.photo === undefined && f.hasPhoto !== false && S.photos[f.id]) f.photo = S.photos[f.id]; }); S.fruits = all.filter(f => !f.deleted); S.goneFruits = all.filter(f => f.deleted);
+}
 function cartItem(key){
   const [fid, sid] = String(key).split("@"), f = fruitById(fid);
   if (!f) return null;
@@ -694,7 +702,8 @@ const cartTotal = () => cartLines().reduce((s, l) => s + l.line, 0);
 
 /* ===== Views ===== */
 function viewShop(){
-  if (S.loadError) return `<div class="empty"><p>Couldn't load the fruit list. Check your internet connection.</p><button class="primary" data-act="reload">Try again</button></div>`;
+  if (!S.fruits.length && S.loading) return `<div class="empty"><p>Loading fruit…</p></div>`;
+  if (S.loadError) return `<div class="empty"><p>Couldn't load the fruit list. Try again.</p><button class="primary" data-act="reload">Try again</button></div>`;
   const list = S.fruits.filter(f => f.active);
   return `
   <header class="top">
@@ -1824,7 +1833,17 @@ function refreshRow(id){
   else { const row = document.querySelector(`#row-${CSS.escape(id)} .qtyzone`); if (row && it) row.innerHTML = qtyZone(it.f); }
   const bar = document.getElementById("cartbar"); if (bar) bar.innerHTML = cartBar();
 }
-const setErr = m => { const e = document.getElementById("err"); if (e) e.textContent = m; };
+const setErr = m => { const e = document.getElementById("err"); if (e) e.textContent = m ? niceError(m) : ""; };
+
+/* One key per order attempt. The same cart and customer reuse the same key, so a retry (even after a reload) can never make a second order. */
+function orderKey(lines){
+  const sig = JSON.stringify([S.customer, lines]), saved = LS.get("fs_okey", null);
+  if (saved && saved.sig === sig && Date.now() - saved.t < 6 * 3600 * 1000) return saved.key;
+  const rnd = (window.crypto && crypto.getRandomValues) ? [...crypto.getRandomValues(new Uint8Array(12))].map(b => b.toString(16).padStart(2, "0")).join("") : String(Math.random()).slice(2) + String(Math.random()).slice(2);
+  const key = "k" + Date.now().toString(36) + rnd;
+  LS.set("fs_okey", { sig, key, t: Date.now() });
+  return key;
+}
 
 /* ===== Actions ===== */
 async function saveBrotherPaid(shop, date, change, btn, msg){
@@ -1838,14 +1857,36 @@ async function saveBrotherPaid(shop, date, change, btn, msg){
     render(); toast(msg);
   } catch(e){ if (btn) btn.disabled = false; toast(e.message || "Couldn't save. Check your internet and try again."); }
 }
+/* My orders: load the statuses, and re-check at most every 30 seconds while that screen is open. */
+async function loadMine(){
+  const sig = S.myOrders.join(",");
+  try { S.mine = { list: await api.status(S.myOrders), sig, at: Date.now() }; }
+  catch(e){ if (!(S.mine && S.mine.list)) S.mine = { error: "Couldn't load your orders. Try again." }; }   // keep the last list on a failed refresh
+}
+function startMinePoll(){
+  clearInterval(startMinePoll.t);
+  if (!REMOTE()) return;
+  startMinePoll.t = setInterval(async () => {
+    if (S.view !== "mine"){ clearInterval(startMinePoll.t); return; }
+    if (document.hidden || S.minePolling) return;
+    S.minePolling = true;
+    try { await loadMine(); if (S.view === "mine") render(); } finally { S.minePolling = false; }
+  }, 30000);
+}
 const ACTIONS = {
-  async reload(){ S.loadError = ""; await loadFruits(); render(); },
+  async reload(){ S.loadError = ""; S.loading = !S.fruits.length; render(); await loadFruits(); render(); },
   inc(id){ const it = cartItem(id); if (!it) return; const q = S.cart[id]; S.cart[id] = q ? r1(q + it.step) : 1; refreshRow(id); },
   dec(id){ const it = cartItem(id); if (!it) return; const q = r1((S.cart[id] || 0) - it.step); if (q <= 0) delete S.cart[id]; else S.cart[id] = q; refreshRow(id); },
   async go(view){
     if ((view === "checkout" || view === "pay") && !cartLines().length) view = "shop";
     S.view = view;
-    if (view === "mine"){ S.mine = null; render(); try { S.mine = { list: await api.status(S.myOrders) }; } catch(e){ S.mine = { error: "Couldn't load your orders. Check your internet connection." }; } }
+    if (view === "mine"){
+      const sig = S.myOrders.join(",");
+      if (!(S.mine && S.mine.list && S.mine.sig === sig && Date.now() - S.mine.at < 30000)){   // fresh enough: no new call
+        S.mine = null; render(); await loadMine();
+      }
+      startMinePoll();
+    }
     if (view === "ownerLogin" && S.ownerKey){ return ACTIONS.ownerLogin(S.ownerKey); }
     render();
   },
@@ -1864,16 +1905,20 @@ const ACTIONS = {
     catch(e){ toast("Copy didn't work. Type the UPI ID: " + CONFIG.UPI_ID); }
   },
   async placeOrder(_, __, btn){
+    if (S.placing) return;
+    S.placing = true;
     const label = btn.textContent;
-    btn.disabled = true; btn.textContent = "Booking…";
+    btn.disabled = true; btn.textContent = "Booking…"; setErr("");
     try {
-      const res = await api.placeOrder({ ...S.customer, items: cartLines().map(l => l.size ? { id:l.id, size:l.size, qty:l.qty } : { id:l.id, qty:l.qty }) });
+      const lines = cartLines().map(l => l.size ? { id:l.id, size:l.size, qty:l.qty } : { id:l.id, qty:l.qty });
+      const res = await api.placeOrder({ ...S.customer, items: lines, idem: orderKey(lines) });
+      LS.set("fs_okey", null);
       S.myOrders = [res.id, ...S.myOrders.filter(x => x !== res.id)].slice(0, 20); LS.set("fs_my", S.myOrders);
-      S.lastOrder = res; S.cart = {}; S.view = "done"; render();
+      S.lastOrder = res; S.cart = {}; S.mine = null; S.view = "done"; render();
     } catch(e){
-      setErr(e.message || "Couldn't book the order. Check your internet and try again.");
-      btn.disabled = false; btn.textContent = label;
-    }
+      setErr(niceError(e && e.message, "Couldn't book the order. Try again."));   // the cart is kept
+      btn.disabled = false; btn.textContent = "Try again";
+    } finally { S.placing = false; }
   },
   async ownerLogin(keyArg){
     const key = typeof keyArg === "string" && keyArg ? keyArg : (document.getElementById("f-key") || {}).value || "";
@@ -2106,8 +2151,13 @@ const ACTIONS = {
     if (bad) return fail(`${bad.name} needs a price and a tray size, or turn it off.`);
     if (btn) btn.disabled = true;
     S.editFruits.forEach(f => { applyAuto(f); if (!(Number(f.storePrice) > 0)) f.storePrice = f.price; });
-    const clean = S.editFruits.map(({ _new, ...f }) => f).concat((S.editGone || []).map(f => ({ ...f, deleted:true, active:false })));
-    try { setFruits(await api.saveFruits(S.ownerKey, clean)); S.editFruits = null; S.editGone = null; S.fruitsDirty = false; render(); toast("Prices saved"); return true; }
+    const clean = S.editFruits.map(({ _new, hasPhoto, ...f }) => { if (REMOTE() && !S.photosReady && f.photo === (S.photos || {})[f.id]) delete f.photo; return f; })   // photos not loaded yet: don't send them, the server keeps what it has
+      .concat((S.editGone || []).map(f => ({ ...f, deleted:true, active:false })));
+    try {
+      const saved = await api.saveFruits(S.ownerKey, clean);
+      if (REMOTE() && S.photosReady){ S.photos = {}; clean.forEach(f => { if (f.photo) S.photos[f.id] = f.photo; }); LS.set("fs_photos", S.photos); }
+      if (REMOTE()) LS.set("fs_fruits_cache", saved);
+      setFruits(saved); S.editFruits = null; S.editGone = null; S.fruitsDirty = false; render(); toast("Prices saved"); return true; }
     catch(e){ if (btn) btn.disabled = false; fail(e.message || "Couldn't save prices."); return false; }
   }
 };
@@ -2195,12 +2245,36 @@ document.addEventListener("change", e => {
 });
 
 /* ===== Start ===== */
+/* Fruit list: show the last saved copy at once, refresh in the background. Photos come later, on their own. */
 async function loadFruits(){
-  try { setFruits(await api.fruits()); }
-  catch(e){ S.loadError = e.message || "load failed"; }
+  try {
+    const list = await api.fruits();
+    if (REMOTE()) LS.set("fs_fruits_cache", list);
+    S.loadError = ""; S.loading = false; S.fruitsAt = Date.now();
+    setFruits(list); loadPhotos();
+  } catch(e){ S.loading = false; if (!S.fruits.length) S.loadError = "load failed"; }   // with a saved copy on screen, a failed refresh stays quiet
+}
+async function loadPhotos(){
+  if (!REMOTE() || S.photoBusy || !S.fruits.concat(S.goneFruits).some(f => f.hasPhoto)) return;
+  S.photoBusy = true;
+  try {
+    const p = await api.photos();
+    S.photos = p; S.photosReady = true; LS.set("fs_photos", p);
+    S.fruits.concat(S.goneFruits).forEach(f => { if (p[f.id]) f.photo = p[f.id]; });
+    if (S.editFruits) S.editFruits.forEach(f => { if (f.photo === undefined && p[f.id]) f.photo = p[f.id]; });
+    if (S.view === "shop") render();
+  } catch(e){} finally { S.photoBusy = false; }
+}
+async function refreshFruits(){
+  const before = JSON.stringify(S.fruits.map(f => [f.id, f.price, f.active, f.storePrice, f.name]));
+  await loadFruits();
+  if (S.view === "shop" && before !== JSON.stringify(S.fruits.map(f => [f.id, f.price, f.active, f.storePrice, f.name]))) render();
 }
 (async function init(){
-  await loadFruits(); render();
+  const cached = REMOTE() ? LS.get("fs_fruits_cache", null) : null;
+  if (Array.isArray(cached) && cached.length){ setFruits(cached); render(); await refreshFruits(); }
+  else { S.loading = true; render(); await loadFruits(); render(); }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && REMOTE() && S.view === "shop" && Date.now() - (S.fruitsAt || 0) > 120000) refreshFruits(); });
   setInterval(() => { const c = document.getElementById("clock"); if (c) c.textContent = clockText(); }, 30000);
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 })();
