@@ -9,7 +9,7 @@
 const CUTOFF_HOUR = 21;            // 9 PM IST, must match index.html
 const SHOPS = ["1town", "2town"];
 const STATUSES = ["pending", "paid", "picked", "rejected"];
-const FRUIT_COLS = ["id","name","te","unit","price","step","trayQty","trayCost","color","active","trayNet","boxSize","photo","storePrice","auto","profitPct","storePct","sizes","deleted","wastePct"];
+const FRUIT_COLS = ["id","name","te","unit","price","step","trayQty","trayCost","color","active","trayNet","boxSize","photo","storePrice","auto","profitPct","storePct","sizes","deleted","wastePct","basketKg"];
 const BOOK_COLS = ["date","shop","data","updated"];
 const ORDER_COLS = ["id","created","name","phone","shop","pickupDate","items","total","utr","status"];
 
@@ -36,7 +36,7 @@ function setup(){
       ["pineapple","Pineapple","అనాస","size",0,1,0,0,"#F08A1C",false,0,"","",0,true,10,10,'[{"id":"s1","name":"Small","min":0.8,"max":1.2},{"id":"s2","name":"Big","min":1.2,"max":1.8}]']
     ].forEach(r => f.appendRow(r));
   }
-  ["trayNet","boxSize","photo","storePrice","auto","profitPct","storePct","sizes","deleted","wastePct"].forEach(c => { const col = FRUIT_COLS.indexOf(c) + 1; if (f.getRange(1, col).getValue() !== c) f.getRange(1, col).setValue(c); });
+  ["trayNet","boxSize","photo","storePrice","auto","profitPct","storePct","sizes","deleted","wastePct","basketKg"].forEach(c => { const col = FRUIT_COLS.indexOf(c) + 1; if (f.getRange(1, col).getValue() !== c) f.getRange(1, col).setValue(c); });
   let bk = b.getSheetByName("Book") || b.insertSheet("Book");
   if (bk.getLastRow() === 0){ bk.getRange("A:D").setNumberFormat("@"); bk.appendRow(BOOK_COLS); bk.setFrozenRows(1); }
   if (o.getLastRow() === 0){
@@ -141,7 +141,8 @@ function readFruits_(withPhotos){
     profitPct: f.profitPct === "" ? "" : Number(f.profitPct), storePct: f.storePct === "" ? "" : Number(f.storePct),
     sizes: parseSizes_(f.sizes),
     deleted: f.deleted === true || String(f.deleted).toUpperCase() === "TRUE",
-    wastePct: f.wastePct === "" || f.wastePct == null ? "" : Number(f.wastePct)
+    wastePct: f.wastePct === "" || f.wastePct == null ? "" : Number(f.wastePct),
+    basketKg: Number(f.basketKg) || 0
   }));
 }
 function dateStr_(v){
@@ -254,7 +255,7 @@ function saveFruits_(list){
   old.forEach(f => { oldPhoto[String(f.id)] = f.photo; });
   const rows = list.map(f => [String(f.id), String(f.name), String(f.te || ""), String(f.unit), Number(f.price) || 0, Number(f.step) || 1,
     Number(f.trayQty) || 0, Number(f.trayCost) || 0, String(f.color || "#B3123A"), !!f.active, Number(f.trayNet) || Number(f.trayQty) || 0, String(f.boxSize || "").slice(0, 20), f.photo === undefined ? cleanPhoto_(oldPhoto[String(f.id)]) : cleanPhoto_(f.photo), Number(f.storePrice) || Number(f.price) || 0, !!f.auto, Number(f.profitPct) || 0, Number(f.storePct) || 0,
-    f.unit === "size" ? JSON.stringify(parseSizes_(f.sizes)) : "", !!f.deleted, f.wastePct === "" || f.wastePct == null ? "" : Number(f.wastePct) || 0]);
+    f.unit === "size" ? JSON.stringify(parseSizes_(f.sizes)) : "", !!f.deleted, f.wastePct === "" || f.wastePct == null ? "" : Number(f.wastePct) || 0, Number(f.basketKg) || 0]);
   const sh = sheet_("Fruits");
   if (sh.getMaxColumns() < FRUIT_COLS.length) sh.insertColumnsAfter(sh.getMaxColumns(), FRUIT_COLS.length - sh.getMaxColumns());
   FRUIT_COLS.forEach((c, i) => { if (sh.getRange(1, i + 1).getValue() !== c) sh.getRange(1, i + 1).setValue(c); });   // header for any new column, no need to run setup() again
@@ -271,8 +272,8 @@ function readBook_(){
 }
 function saveBook_(row){
   if (!row || !/^\d{4}-\d{2}-\d{2}$/.test(String(row.date))) throw bad_("Pick a valid day.");
-  if (SHOPS.indexOf(row.shop) < 0) throw bad_("Pick a shop.");
-  const data = JSON.stringify({ fruits: row.fruits || {}, cash: row.cash, upi: row.upi, expenses: row.expenses, brotherPaid: Array.isArray(row.brotherPaid) ? row.brotherPaid.slice(0, 200).map(p => ({ amount: Number(p && p.amount) || 0 })) : undefined, updated: row.updated });
+  if (SHOPS.indexOf(row.shop) < 0 && row.shop !== "settings") throw bad_("Pick a shop.");   // "settings" holds the profit cycle settings
+  const data = JSON.stringify({ fruits: row.fruits || {}, cash: row.cash, upi: row.upi, expenses: row.expenses, brotherPaid: Array.isArray(row.brotherPaid) ? row.brotherPaid.slice(0, 200).map(p => ({ amount: Number(p && p.amount) || 0 })) : undefined, updated: row.updated, cycle: row.cycle && typeof row.cycle === "object" ? { start: String(row.cycle.start || "").slice(0, 10), len: Number(row.cycle.len) || 3, closed: row.cycle.closed === "" ? "" : Number(row.cycle.closed) } : undefined });
   if (data.length > 40000) throw bad_("Entry is too large.");
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
