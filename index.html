@@ -706,7 +706,7 @@ const I18N = {
     pickAt:"Pick up at", pickDay:"Pickup day", toPay:"Continue to payment", payTo:"Pay to book", copy:"Copy", payStep1:"Copy our UPI ID", payStep2:"Pay {0} in PhonePe, Google Pay or Paytm.",
     payUpi:"Pay {0} with UPI app", payHint:"Opens PhonePe, Google Pay or Paytm with the amount already filled in.", otherWays:"Other ways to pay", afterPay:"Paid? Tap below to book your order.",
     showQR:"Show QR code", qrNote:"Someone else can scan this from their phone. On your own phone, take a screenshot and use \"scan from gallery\" in your UPI app.",
-    bookBtn:"I've paid {0}, book my order", payNote:"Pay from your UPI app first. We confirm your payment before pickup.", booked:"Order {0} booked", checking:"We're checking your payment.",
+    bookBtn:"I've paid {0}, book my order", scanPhone:"Scan this QR code with PhonePe, Google Pay or Paytm on your phone.", noApp:"No UPI app opened? Copy our UPI ID or scan the QR code below.", payNote:"Pay from your UPI app first. We confirm your payment before pickup.", booked:"Order {0} booked", checking:"We're checking your payment.",
     pickupOn:"Pick up on {0} at {1}.", showNo:"Show this order number at the counter.", seeOrders:"See my orders", orderMore:"Order more fruit",
     trk1:"Placed", trk2:"Payment checked", trk3:"Ready", trk4:"Picked up", reorder:"Reorder", noOrders:"No orders on this phone yet.", noOrdersS:"Your orders will show up here.",
     chooseFruit:"Choose fruit", loadingOrders:"Loading your orders…", pickupLine:"Pickup {0} at {1}", owner:"Shop owner", demo:"Demo mode: orders are saved on this phone only.",
@@ -723,7 +723,7 @@ const I18N = {
     pickAt:"ఎక్కడ తీసుకుంటారు", pickDay:"తీసుకునే రోజు", toPay:"చెల్లింపుకు వెళ్ళండి", payTo:"చెల్లించి బుక్ చేయండి", copy:"కాపీ", payStep1:"మా UPI ID కాపీ చేయండి", payStep2:"ఫోన్‌పే, గూగుల్ పే లేదా పేటీఎం లో {0} చెల్లించండి.",
     payUpi:"UPI యాప్‌తో {0} చెల్లించండి", payHint:"ఫోన్‌పే, గూగుల్ పే లేదా పేటీఎం మొత్తంతో సహా తెరుచుకుంటుంది.", otherWays:"ఇతర చెల్లింపు మార్గాలు", afterPay:"చెల్లించారా? ఆర్డర్ బుక్ చేయడానికి కింద నొక్కండి.",
     showQR:"QR కోడ్ చూపించు", qrNote:"వేరొకరు తమ ఫోన్‌తో స్కాన్ చేయవచ్చు. మీ ఫోన్‌లో అయితే స్క్రీన్‌షాట్ తీసి UPI యాప్‌లో గ్యాలరీ నుండి స్కాన్ చేయండి.",
-    bookBtn:"{0} చెల్లించాను, ఆర్డర్ బుక్ చేయండి", payNote:"ముందు UPI యాప్ నుండి చెల్లించండి. తీసుకునే ముందు మీ చెల్లింపును మేము నిర్ధారిస్తాం.", booked:"ఆర్డర్ {0} బుక్ అయింది", checking:"మీ చెల్లింపును పరిశీలిస్తున్నాం.",
+    bookBtn:"{0} చెల్లించాను, ఆర్డర్ బుక్ చేయండి", scanPhone:"మీ ఫోన్‌లో ఫోన్‌పే, గూగుల్ పే లేదా పేటీఎంతో ఈ QR కోడ్ స్కాన్ చేయండి.", noApp:"UPI యాప్ తెరవలేదా? మా UPI ID కాపీ చేయండి లేదా కింద QR కోడ్ స్కాన్ చేయండి.", payNote:"ముందు UPI యాప్ నుండి చెల్లించండి. తీసుకునే ముందు మీ చెల్లింపును మేము నిర్ధారిస్తాం.", booked:"ఆర్డర్ {0} బుక్ అయింది", checking:"మీ చెల్లింపును పరిశీలిస్తున్నాం.",
     pickupOn:"{0} న {1} లో తీసుకోండి.", showNo:"కౌంటర్ వద్ద ఈ ఆర్డర్ నంబర్ చూపించండి.", seeOrders:"నా ఆర్డర్లు చూడండి", orderMore:"ఇంకా పండ్లు ఆర్డర్ చేయండి",
     trk1:"ఆర్డర్ చేశారు", trk2:"చెల్లింపు పరిశీలన", trk3:"సిద్ధం", trk4:"తీసుకున్నారు", reorder:"మళ్ళీ ఆర్డర్", noOrders:"ఈ ఫోన్‌లో ఇంకా ఆర్డర్లు లేవు.", noOrdersS:"మీ ఆర్డర్లు ఇక్కడ కనిపిస్తాయి.",
     chooseFruit:"పండ్లు ఎంచుకోండి", loadingOrders:"మీ ఆర్డర్లు వస్తున్నాయి…", pickupLine:"{0}, {1}", owner:"షాప్ యజమాని", demo:"డెమో మోడ్: ఆర్డర్లు ఈ ఫోన్‌లోనే ఉంటాయి.",
@@ -1237,12 +1237,12 @@ function viewPay(){
   <header class="top"><button class="link" data-act="go" data-id="checkout">${esc(t("back"))}</button><span class="title">${esc(t("payTo"))}</span><span style="width:48px"></span></header>
   <section class="card">
     <p class="amount">${rupee(amt)}</p>
-    <a class="${tried ? "ghost" : "primary"} wide big paylink" id="paylink" data-act="payUpi" href="${esc(upiUrl())}">${esc(t("payUpi", rupee(amt)))}</a>
-    <p class="note" style="margin:8px 0 16px">${esc(t("payHint"))}</p>
+    ${touch ? `<a class="${tried ? "ghost" : "primary"} wide big paylink" id="paylink" data-act="payUpi" href="${esc(upiUrl())}">${esc(t("payUpi", rupee(amt)))}</a>
+    <p class="note" style="margin:8px 0 16px">${esc(t("payHint"))}</p>` : `<p class="note" style="margin:12px 0 0"><strong>${esc(t("scanPhone"))}</strong></p>`}
     <p class="note afterpay" id="afterpay" ${tried ? "" : "hidden"}><strong>${esc(t("afterPay"))}</strong></p>
     <p class="err" id="err" role="alert"></p>
     <button class="${tried ? "primary" : "ghost"} wide big" id="bookbtn" data-act="placeOrder">${esc(t("bookBtn", rupee(amt)))}</button>
-    <details style="margin-top:16px" ${touch ? "" : "open"}><summary>${esc(t("otherWays"))}</summary>
+    <details id="otherways" style="margin-top:16px" ${touch ? "" : "open"}><summary>${esc(t("otherWays"))}</summary>
       <div class="upi"><code>${esc(CONFIG.UPI_ID)}</code><button class="ghost" data-act="copyUpi">${esc(t("copy"))}</button></div>
       <div id="qr"></div>
       <p class="note">${esc(t("qrNote"))}</p>
@@ -2374,6 +2374,11 @@ const ACTIONS = {
   payUpi(){   // the link itself opens the UPI app; we just make "book my order" the next step
     S.upiTried = true;
     const a = document.getElementById("afterpay"), b = document.getElementById("bookbtn"), l = document.getElementById("paylink");
+    S.upiLeft = false; clearTimeout(S.upiTimer);
+    S.upiTimer = setTimeout(() => {   // the page never went to the background: no UPI app took the link
+      if (S.upiLeft || S.view !== "pay") return;
+      S.upiTried = false; render(); const d = document.getElementById("otherways"); if (d) d.open = true; toast(t("noApp"));
+    }, 2500);
     if (a) a.hidden = false; if (b) b.className = "primary wide big"; if (l){ l.classList.remove("primary"); l.classList.add("ghost"); }
   },
   async copyUpi(){
@@ -2647,6 +2652,7 @@ async function leavePrices(run){
   run();
 }
 document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") S.upiLeft = true;
   if (document.visibilityState !== "visible" || S.view !== "pay" || !S.upiTried) return;
   const b = document.getElementById("bookbtn"); if (b){ try { b.scrollIntoView({ block:"center", behavior:"smooth" }); } catch(e){} toast(t("afterPay")); }
 });
