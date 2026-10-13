@@ -58,6 +58,6 @@ Tap a fruit on the customer screen to show a short About line. The lines live in
 
 ## Good to know
 - Prices always come from the Sheet, so nobody can change the price on their phone.
-- Customers choose **Pay with QR** or **Pay at shop** after placing an order. Nothing is marked paid until you press **Payment received**.
+- After placing an order, customers tap **Pay with UPI** (or Google Pay, PhonePe, Paytm, or the QR for another phone), or choose **Pay at shop**. Nothing is marked paid until you press **Payment received**.
 - Change the owner key in Script properties if anyone else learns it.
 - After you change `Code.gs`, use **Deploy > Manage deployments > Edit > New version**, or the old code keeps running.
