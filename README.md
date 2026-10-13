@@ -48,6 +48,14 @@ To switch it on (live mode only):
 
 Never put the API key inside `index.html`, or anyone opening your app could use it.
 
+## Fruit photos
+Every fruit card shows, in this order: the photo you added in **Prices** (Choose photo / Take photo), then a file in the `img` folder, then a drawn icon in the fruit's colour, so a card is never blank.
+
+To add a photo file: save it as `img/<fruit-id>.webp` and upload it with the other files. The file name is the fruit id, for example `img/pomegranate.webp`, `img/green-apple.webp`, `img/black-grapes.webp`. The id is the lowercase name with dashes (it shows in the fruit's row on the Prices tab). Use a square picture, about 400 x 400 px, and keep each file under 150 KB. Photos load only when the customer scrolls to them.
+
+## "About" lines
+Tap a fruit on the customer screen to show a short About line. The lines live in the `ABOUT` list in `index.html`, keyed by fruit id. A fruit with no entry shows nothing.
+
 ## Good to know
 - Prices always come from the Sheet, so nobody can change the price on their phone.
 - The same UTR can't be used for two orders.
