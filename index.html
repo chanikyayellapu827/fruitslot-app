@@ -1348,7 +1348,7 @@ function ownerOrdersHtml(){
         <div class="who"><span><strong>${esc(o.name)}</strong> · ${shopShort}</span><a class="callbtn" href="tel:${esc(o.phone)}" aria-label="Call ${esc(o.name)}">${ico("phone", 18)}<span>${esc(o.phone)}</span></a></div>
         <p class="items">${(o.items || []).map(i => `${esc(i.name)} ${fmtQty(Number(i.qty), i.unit)}`).join(", ")}</p>
         <p class="oamt">${rupee(o.total)}</p>
-        <p class="note">Placed ${esc(placedAt(o.created))}${o.utr ? `, UTR <code>${esc(o.utr)}</code>` : ""}</p>
+        <p class="note">Placed ${esc(placedAt(o.created))}</p>
         ${btns ? `<div class="actions">${btns}</div>` : ""}
       </li>`;
     }).join("")}</ul>`;
@@ -1722,7 +1722,7 @@ function aiContext(){
   }));
   const p30 = periodStats(dayList(today, 30));
   const orders = S.ownerOrders.filter(o => String(o.pickupDate).slice(0,10) >= dayList(today, 3)[0]).slice(-40)
-    .map(o => ({ id:o.id, name:o.name, shop:o.shop, pickup:String(o.pickupDate).slice(0,10), status:o.status, total:o.total, utr:o.utr, items:(o.items || []).map(i => `${i.name} x${i.qty}`).join(", ") }));
+    .map(o => ({ id:o.id, name:o.name, shop:o.shop, pickup:String(o.pickupDate).slice(0,10), status:o.status, total:o.total, items:(o.items || []).map(i => `${i.name} x${i.qty}`).join(", ") }));
   return { today, shops: CONFIG.SHOPS, fruits, daily_book_last_14_days: days, brother_account: (() => { const a = brotherAccount(); return suppliedShop() ? { shop:suppliedShop().id, billed_total:a.billed, paid_total:a.paid, balance_owed:a.balance } : undefined; })(),
     last_30_days: { note:"combined own shops only; supplied shops are billed at cost and left out", profit:p30.profit, sales:p30.revenue, waste_pct:Math.round(p30.wastePct * 10) / 10, days_recorded:p30.days, app_orders:p30.appOrders },
     app_orders_recent: orders, order_cutoff: cutoffLabel() };
