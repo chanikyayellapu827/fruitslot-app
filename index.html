@@ -1261,7 +1261,7 @@ function upiUrl(o, app){
   return PAY_APPS[app || "upi"] + "?" + [q("pa", CONFIG.UPI_ID), q("pn", CONFIG.PAYEE), q("am", Number(o.total).toFixed(2)), q("cu", "INR"), q("tn", o.id)].join("&");
 }
 function viewDone(){
-  const o = S.lastOrder, st = S.donePay || "", coarse = matchMedia("(pointer:coarse)").matches, link = CONFIG.UPI_LINK;
+  const o = S.lastOrder, st = S.donePay || "", coarse = isPhone(), link = CONFIG.UPI_LINK;
   const payBlock = st === "thanks" ? `<p class="paymsg ok" role="status">${esc(t("pl_thanks"))}</p>`
     : st === "shop" ? `<p class="paymsg" role="status">${esc(t("pl_pickup2"))}</p>`
     : !link ? `<h2 class="paytitle">${esc(t("pl_qrid"))}</h2>
@@ -2310,7 +2310,7 @@ function render(){
 /* On a phone, the QR for the order is saved by itself as a picture (the browser puts it in Downloads, which the gallery shows). A site can't write to the gallery directly. */
 async function autoSaveQR(o){
   try {
-    if (!matchMedia("(pointer:coarse)").matches || S.view !== "done") return;
+    if (!isPhone() || S.view !== "done") return;
     const q = qrcode(0, "M"); q.addData(upiUrl(o)); q.make();
     const n = q.getModuleCount(), cell = 10, pad = 4 * cell, c = document.createElement("canvas");
     c.width = c.height = n * cell + pad * 2;
@@ -2321,6 +2321,8 @@ async function autoSaveQR(o){
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);   // the steps under the QR tell the customer what to do next
   } catch(e){}   // if the browser blocks it, the QR is still on the screen
 }
+/* A phone: touch screen, or no hover, or a narrow screen (some phones report a mouse when "desktop site" is on). */
+const isPhone = () => matchMedia("(pointer:coarse)").matches || matchMedia("(hover:none)").matches || Math.min(screen.width || 9999, window.innerWidth) <= 700;
 function drawQR(){
   const el = document.getElementById("qr"); if (!el || !S.lastOrder) return;
   try {
