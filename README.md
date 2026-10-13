@@ -20,7 +20,7 @@ The app works in two modes:
 4. Open that link on your phone and use **Add to Home screen**.
 
 ## 3. Every day
-- **Evening, after 9 PM:** open the owner screen, check each payment against your PhonePe business history using the UTR, and press **Payment received** or **Not received**.
+- **Evening, after 9 PM:** open the owner screen and check each order's payment against your PhonePe business history (match the amount and time; the order number is in the payment note). Press **Payment received** or **Not received**. Customers who chose **Pay at shop** stay on *Check payment* until they pay you at pickup, then press **Payment received**.
 - **Trays to buy** tab: shows how many trays of each fruit to buy for tomorrow and how much is left for the counter.
 - **Next day at pickup:** press **Picked up** when the customer collects.
 - **Daily book** has 4 steps for each shop. Pick the shop and day at the top.
@@ -58,6 +58,6 @@ Tap a fruit on the customer screen to show a short About line. The lines live in
 
 ## Good to know
 - Prices always come from the Sheet, so nobody can change the price on their phone.
-- The same UTR can't be used for two orders.
+- Customers choose **Pay with QR** or **Pay at shop** after placing an order. Nothing is marked paid until you press **Payment received**.
 - Change the owner key in Script properties if anyone else learns it.
 - After you change `Code.gs`, use **Deploy > Manage deployments > Edit > New version**, or the old code keeps running.
