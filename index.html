@@ -598,7 +598,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 /* ===== Settings: change these ===== */
 const CONFIG = {
   API_URL: "https://script.google.com/macros/s/AKfycbxBxQ9CNVKYOlU_fNnQaBL_N2yz9zhZ5rg92KEKqT5k-IN7DS_ZQTSOB_2LMLLJ7wji/exec",              // paste your Google Apps Script web app URL here. Empty = demo mode (orders stay on this phone only)
-  UPI_ID: "Q800513737@ybl",    // the UPI ID customers pay to – check this is correct
+  UPI_ID: "yellapuchanikya369@ybl",    // the UPI ID customers pay to – check this is correct
+  UPI_LINK: true,              // true = "Pay with UPI" opens the customer's UPI app. Set false if the UPI app refuses link payments to this ID (PhonePe business QR IDs starting with Q do); the button then just shows the QR
   PAYEE: "FruitSlot",
   CUTOFF_HOUR: 21,             // orders close at 9 PM for next-day pickup
   SHOPS: [
@@ -1260,7 +1261,8 @@ function viewDone(){
         <div class="upi"><span class="note">${esc(t("pl_id"))}</span> <code>${esc(CONFIG.UPI_ID)}</code><button class="ghost" data-act="copyUpi">${esc(t("copy"))}</button></div></div>
       <button class="primary wide big" data-act="payDone">${esc(t("pl_paid"))}</button>
       <button class="ghost wide big" data-act="payShop">${esc(t("pl_shop"))}</button>`
-    : `<button class="primary wide big" data-act="payQR">${esc(t("pl_qrpay"))}</button>
+    : `${CONFIG.UPI_LINK ? `<a class="primary wide big paylink" id="paylink" data-act="payUpi" href="${esc(upiUrl(o))}">${esc(t("pl_pay", exactRupee(o.total)))}</a>`
+        : `<button class="primary wide big" data-act="payQR">${esc(t("pl_qrpay"))}</button>`}
       <button class="ghost wide big" data-act="payShop">${esc(t("pl_shop"))}</button>`;
   return `<section class="done">
     <div class="tickwrap" aria-hidden="true"><span class="ring"></span><svg class="tickc" viewBox="0 0 96 96"><circle cx="48" cy="48" r="44"/><path d="M28 50l14 14 27-30"/></svg></div>
@@ -2390,6 +2392,9 @@ const ACTIONS = {
     } catch(e){ toast(t("pl_qrfail"), "err"); }
   },
   payQR(){ S.donePay = "qr"; render(); },
+  payUpi(){   // the link opens the UPI app by itself; meanwhile the QR and "I've paid" appear as the fallback
+    S.upiLeft = false; setTimeout(() => { if (S.view === "done" && !S.donePay) { S.donePay = "qr"; render(); } }, 400);
+  },
   payShop(){ S.donePay = "shop"; render(); },
   payDone(){ S.donePay = "thanks"; render(); },
   async copyUpi(){
@@ -2668,6 +2673,11 @@ async function leavePrices(run){
   } else { S.editFruits = null; S.editGone = null; S.fruitsDirty = false; }
   run();
 }
+document.addEventListener("visibilitychange", () => {   // went to the UPI app and came back: say thanks
+  if (S.view !== "done") return;
+  if (document.visibilityState === "hidden"){ if (S.donePay === "qr") S.upiLeft = true; return; }
+  if (S.upiLeft && S.donePay === "qr"){ S.upiLeft = false; S.donePay = "thanks"; render(); }
+});
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const fn = ACTIONS[b.dataset.act]; if (!fn) return;
