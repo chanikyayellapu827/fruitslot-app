@@ -587,6 +587,7 @@ const CONFIG = {
   API_URL: "https://script.google.com/macros/s/AKfycbxBxQ9CNVKYOlU_fNnQaBL_N2yz9zhZ5rg92KEKqT5k-IN7DS_ZQTSOB_2LMLLJ7wji/exec",              // paste your Google Apps Script web app URL here. Empty = demo mode (orders stay on this phone only)
   UPI_ID: "Q800513737@ybl",    // the UPI ID customers pay to – check this is correct
   PAYEE: "FruitSlot",
+  GATEWAY: false,              // true = customers pay online with Razorpay and orders become Paid by themselves. Turn on only after RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are in Apps Script and the new Code.gs is deployed
   UPI_LINK: false,             // true = show the one-tap "Pay with UPI app" button. Leave false while UPI_ID is a PhonePe business QR ID (Q…@ybl): PhonePe blocks link payments to it and only allows scanning its QR
   CUTOFF_HOUR: 21,             // orders close at 9 PM for next-day pickup
   SHOPS: [
@@ -663,7 +664,7 @@ function normFruit(f){
   return n;
 }
 const PALETTE = ["#B3123A","#C8202F","#F08A1C","#E8B923","#7DB33A","#2F7D46","#7A5A2B","#3B1F4A","#3A4A8C","#D9568C"];
-const STATUS_CUSTOMER = { pending:"Checking your payment", paid:"Paid. Ready on pickup day", picked:"Picked up", rejected:"Payment not found. Please visit the shop with your payment screen" };
+const STATUS_CUSTOMER = { unpaid:"Payment not completed", pending:"Checking your payment", paid:"Paid. Ready on pickup day", picked:"Picked up", rejected:"Payment not found. Please visit the shop with your payment screen" };
 const STATUS_OWNER = { pending:"Check payment", paid:"Paid", picked:"Picked up", rejected:"Rejected" };
 
 /* ===== Helpers ===== */
@@ -707,7 +708,8 @@ const I18N = {
     pickAt:"Pick up at", pickDay:"Pickup day", toPay:"Continue to payment", payTo:"Pay to book", copy:"Copy", payStep1:"Copy our UPI ID", payStep2:"Pay {0} in PhonePe, Google Pay or Paytm.",
     payUpi:"Pay {0} with UPI app", payHint:"Opens PhonePe, Google Pay or Paytm with the amount already filled in.", otherWays:"Other ways to pay", afterPay:"Paid? Tap below to book your order.",
     showQR:"Show QR code", qrNote:"Someone else can scan this from their phone. On your own phone, take a screenshot and use \"scan from gallery\" in your UPI app.",
-    bookBtn:"I've paid {0}, book my order", scanPhone:"Scan this QR code with PhonePe, Google Pay or Paytm on your phone.", noApp:"No UPI app opened? Copy our UPI ID or scan the QR code below.", saveQR:"Save QR to gallery", qrSteps:"Save the QR code, open PhonePe, Google Pay or Paytm, tap Scan, then choose the picture from your gallery.", payNote:"Pay from your UPI app first. We confirm your payment before pickup.", booked:"Order {0} booked", checking:"We're checking your payment.",
+    bookBtn:"I've paid {0}, book my order", scanPhone:"Scan this QR code with PhonePe, Google Pay or Paytm on your phone.", noApp:"No UPI app opened? Copy our UPI ID or scan the QR code below.", payNow:"Pay {0}", payOnline:"Pay with UPI, card or net banking. Your order is booked as soon as the payment goes through.", payNotDone:"Payment wasn't completed. Tap Pay to try again.", paidOk:"Payment received. Thank you!", confirming:"Payment received. Booking your order…", st_unpaid:"Payment not completed",
+    saveQR:"Save QR to gallery", qrSteps:"Save the QR code, open PhonePe, Google Pay or Paytm, tap Scan, then choose the picture from your gallery.", payNote:"Pay from your UPI app first. We confirm your payment before pickup.", booked:"Order {0} booked", checking:"We're checking your payment.",
     pickupOn:"Pick up on {0} at {1}.", showNo:"Show this order number at the counter.", seeOrders:"See my orders", orderMore:"Order more fruit",
     trk1:"Placed", trk2:"Payment checked", trk3:"Ready", trk4:"Picked up", reorder:"Reorder", noOrders:"No orders on this phone yet.", noOrdersS:"Your orders will show up here.",
     chooseFruit:"Choose fruit", loadingOrders:"Loading your orders…", pickupLine:"Pickup {0} at {1}", owner:"Shop owner", demo:"Demo mode: orders are saved on this phone only.",
@@ -724,7 +726,8 @@ const I18N = {
     pickAt:"ఎక్కడ తీసుకుంటారు", pickDay:"తీసుకునే రోజు", toPay:"చెల్లింపుకు వెళ్ళండి", payTo:"చెల్లించి బుక్ చేయండి", copy:"కాపీ", payStep1:"మా UPI ID కాపీ చేయండి", payStep2:"ఫోన్‌పే, గూగుల్ పే లేదా పేటీఎం లో {0} చెల్లించండి.",
     payUpi:"UPI యాప్‌తో {0} చెల్లించండి", payHint:"ఫోన్‌పే, గూగుల్ పే లేదా పేటీఎం మొత్తంతో సహా తెరుచుకుంటుంది.", otherWays:"ఇతర చెల్లింపు మార్గాలు", afterPay:"చెల్లించారా? ఆర్డర్ బుక్ చేయడానికి కింద నొక్కండి.",
     showQR:"QR కోడ్ చూపించు", qrNote:"వేరొకరు తమ ఫోన్‌తో స్కాన్ చేయవచ్చు. మీ ఫోన్‌లో అయితే స్క్రీన్‌షాట్ తీసి UPI యాప్‌లో గ్యాలరీ నుండి స్కాన్ చేయండి.",
-    bookBtn:"{0} చెల్లించాను, ఆర్డర్ బుక్ చేయండి", scanPhone:"మీ ఫోన్‌లో ఫోన్‌పే, గూగుల్ పే లేదా పేటీఎంతో ఈ QR కోడ్ స్కాన్ చేయండి.", noApp:"UPI యాప్ తెరవలేదా? మా UPI ID కాపీ చేయండి లేదా కింద QR కోడ్ స్కాన్ చేయండి.", saveQR:"QR గ్యాలరీలో సేవ్ చేయండి", qrSteps:"QR కోడ్ సేవ్ చేసి, ఫోన్‌పే, గూగుల్ పే లేదా పేటీఎం తెరిచి, Scan నొక్కి, గ్యాలరీ నుండి ఆ చిత్రాన్ని ఎంచుకోండి.", payNote:"ముందు UPI యాప్ నుండి చెల్లించండి. తీసుకునే ముందు మీ చెల్లింపును మేము నిర్ధారిస్తాం.", booked:"ఆర్డర్ {0} బుక్ అయింది", checking:"మీ చెల్లింపును పరిశీలిస్తున్నాం.",
+    bookBtn:"{0} చెల్లించాను, ఆర్డర్ బుక్ చేయండి", scanPhone:"మీ ఫోన్‌లో ఫోన్‌పే, గూగుల్ పే లేదా పేటీఎంతో ఈ QR కోడ్ స్కాన్ చేయండి.", noApp:"UPI యాప్ తెరవలేదా? మా UPI ID కాపీ చేయండి లేదా కింద QR కోడ్ స్కాన్ చేయండి.", payNow:"{0} చెల్లించండి", payOnline:"UPI, కార్డ్ లేదా నెట్ బ్యాంకింగ్‌తో చెల్లించండి. చెల్లింపు అయిన వెంటనే మీ ఆర్డర్ బుక్ అవుతుంది.", payNotDone:"చెల్లింపు పూర్తి కాలేదు. మళ్ళీ ప్రయత్నించడానికి Pay నొక్కండి.", paidOk:"చెల్లింపు అందింది. ధన్యవాదాలు!", confirming:"చెల్లింపు అందింది. ఆర్డర్ బుక్ చేస్తున్నాం…", st_unpaid:"చెల్లింపు పూర్తి కాలేదు",
+    saveQR:"QR గ్యాలరీలో సేవ్ చేయండి", qrSteps:"QR కోడ్ సేవ్ చేసి, ఫోన్‌పే, గూగుల్ పే లేదా పేటీఎం తెరిచి, Scan నొక్కి, గ్యాలరీ నుండి ఆ చిత్రాన్ని ఎంచుకోండి.", payNote:"ముందు UPI యాప్ నుండి చెల్లించండి. తీసుకునే ముందు మీ చెల్లింపును మేము నిర్ధారిస్తాం.", booked:"ఆర్డర్ {0} బుక్ అయింది", checking:"మీ చెల్లింపును పరిశీలిస్తున్నాం.",
     pickupOn:"{0} న {1} లో తీసుకోండి.", showNo:"కౌంటర్ వద్ద ఈ ఆర్డర్ నంబర్ చూపించండి.", seeOrders:"నా ఆర్డర్లు చూడండి", orderMore:"ఇంకా పండ్లు ఆర్డర్ చేయండి",
     trk1:"ఆర్డర్ చేశారు", trk2:"చెల్లింపు పరిశీలన", trk3:"సిద్ధం", trk4:"తీసుకున్నారు", reorder:"మళ్ళీ ఆర్డర్", noOrders:"ఈ ఫోన్‌లో ఇంకా ఆర్డర్లు లేవు.", noOrdersS:"మీ ఆర్డర్లు ఇక్కడ కనిపిస్తాయి.",
     chooseFruit:"పండ్లు ఎంచుకోండి", loadingOrders:"మీ ఆర్డర్లు వస్తున్నాయి…", pickupLine:"{0}, {1}", owner:"షాప్ యజమాని", demo:"డెమో మోడ్: ఆర్డర్లు ఈ ఫోన్‌లోనే ఉంటాయి.",
@@ -925,8 +928,12 @@ const REMOTE = () => !!CONFIG.API_URL;
 const api = {
   async photos(){ return REMOTE() ? remoteGet({ action:"photos" }, 1) : {}; },
   async fruits(){ return REMOTE() ? remoteGet({ action:"fruits" }, 1) : LS.get("fs_fruits", DEFAULT_FRUITS); },
+  async payConfirm(p){
+    if (REMOTE()) return remotePost({ action:"payConfirm", ...p }, 3);
+    return { id:p.id, status:"paid" };
+  },
   async placeOrder(p){
-    if (REMOTE()) return remotePost({ action:"order", ...p }, 2);
+    if (REMOTE()) return remotePost({ action:"order", ...p, gateway: CONFIG.GATEWAY }, 2);
     const fruits = LS.get("fs_fruits", DEFAULT_FRUITS), orders = LS.get("fs_orders", []);
     const items = p.items.map(i => {
       const f = fruits.map(normFruit).find(x => x.id === i.id && x.active);
@@ -938,7 +945,7 @@ const api = {
       return { id:f.id, name:f.name, unit:f.unit, qty:i.qty, price:f.price };
     });
     const total = items.reduce((s, i) => s + i.qty * i.price, 0);
-    const o = { id:"FS" + (1001 + orders.length), created:new Date().toISOString(), name:p.name, phone:p.phone, shop:p.shop, pickupDate:pickupDate(), items, total, status:"pending" };
+    const o = { id:"FS" + (1001 + orders.length), created:new Date().toISOString(), name:p.name, phone:p.phone, shop:p.shop, pickupDate:pickupDate(), items, total, status: CONFIG.GATEWAY ? "paid" : "pending" };   // demo mode: online payment is pretended, the order counts as paid
     orders.push(o); LS.set("fs_orders", orders);
     return { id:o.id, total:o.total, pickupDate:o.pickupDate, shop:o.shop, status:o.status };
   },
@@ -1232,7 +1239,19 @@ function upiUrl(){
   const note = ("FruitSlot " + (S.customer.name || "")).trim().slice(0, 40);
   return `upi://pay?pa=${encodeURIComponent(CONFIG.UPI_ID)}&pn=${encodeURIComponent(CONFIG.PAYEE)}&am=${cartTotal().toFixed(2)}&cu=INR&tn=${encodeURIComponent(note)}`;
 }
+function viewPayOnline(){
+  const amt = cartTotal();
+  return `
+  <header class="top"><button class="link" data-act="go" data-id="checkout">${esc(t("back"))}</button><span class="title">${esc(t("payTo"))}</span><span style="width:48px"></span></header>
+  <section class="card">
+    <p class="amount">${rupee(amt)}</p>
+    <p class="note" style="margin:12px 0 16px">${esc(t("payOnline"))}</p>
+    <p class="err" id="err" role="alert"></p>
+    <button class="primary wide big" id="paynow" data-act="payNow">${esc(t("payNow", rupee(amt)))}</button>
+  </section>`;
+}
 function viewPay(){
+  if (CONFIG.GATEWAY) return viewPayOnline();
   const amt = cartTotal(), touch = matchMedia("(pointer:coarse)").matches && CONFIG.UPI_LINK, phone = matchMedia("(pointer:coarse)").matches, tried = !!S.upiTried;
   const other = `<details id="otherways" style="margin:16px 0" ${touch ? "" : "open"}><summary>${esc(t(touch ? "otherWays" : "showQR"))}</summary>
       <div class="upi"><code>${esc(CONFIG.UPI_ID)}</code><button class="ghost" data-act="copyUpi">${esc(t("copy"))}</button></div>
@@ -1258,7 +1277,7 @@ function viewDone(){
   return `<section class="done">
     <div class="tickwrap" aria-hidden="true"><span class="ring"></span><svg class="tickc" viewBox="0 0 96 96"><circle cx="48" cy="48" r="44"/><path d="M28 50l14 14 27-30"/></svg></div>
     <h1>${esc(t("booked", o.id))}</h1>
-    <p>${esc(t("checking"))}</p>
+    <p>${esc(o.status === "paid" ? t("paidOk") : t("checking"))}</p>
     <div class="ticket"><p><strong>${esc(o.id)}</strong> · ${rupee(o.total)}</p><p>${esc(t("pickupOn", niceDate(o.pickupDate), shopName(o.shop)))}</p><p class="note">${esc(t("showNo"))}</p></div>
     <p style="margin-top:24px"><button class="primary wide" data-act="go" data-id="mine">${esc(t("seeOrders"))}</button></p>
     <button class="link" data-act="go" data-id="shop">${esc(t("orderMore"))}</button>
@@ -2297,6 +2316,18 @@ function refreshRow(id){
 const setErr = m => { const e = document.getElementById("err"); if (e) e.textContent = m ? niceError(m) : ""; };
 
 /* One key per order attempt. The same cart and customer reuse the same key, so a retry (even after a reload) can never make a second order. */
+function loadCheckout(){
+  if (window.Razorpay) return Promise.resolve();
+  return new Promise((ok, no) => { const sc = document.createElement("script"); sc.src = "https://checkout.razorpay.com/v1/checkout.js"; sc.onload = ok; sc.onerror = () => no(new Error("Couldn't open the payment page. Check your internet and try again.")); document.head.appendChild(sc); });
+}
+/* After the order is saved (and paid, when paying online): remember it and show the done screen. */
+function finishOrder(res){
+  const lines = cartLines();
+  LS.set("fs_okey", null);
+  const oi = myItems(); oi[res.id] = lines.map(l => ({ k:l.key, n:l.s ? l.name : l.f.name, q:l.qty, u:l.unit })); Object.keys(oi).slice(0, -30).forEach(k => delete oi[k]); LS.set("fs_oitems", oi);
+  S.myOrders = [res.id, ...S.myOrders.filter(x => x !== res.id)].slice(0, 20); LS.set("fs_my", S.myOrders);
+  S.lastOrder = res; S.cart = {}; S.mine = null; S.view = "done"; render();
+}
 function orderKey(lines){
   const sig = JSON.stringify([S.customer, lines]), saved = LS.get("fs_okey", null);
   if (saved && saved.sig === sig && Date.now() - saved.t < 6 * 3600 * 1000) return saved.key;
@@ -2395,6 +2426,38 @@ const ACTIONS = {
     try { await navigator.clipboard.writeText(CONFIG.UPI_ID); toast("UPI ID copied"); }
     catch(e){ toast("Copy didn't work. Type the UPI ID: " + CONFIG.UPI_ID); }
   },
+  async payNow(_, __, btn){
+    if (S.placing) return;
+    S.placing = true;
+    const label = btn.textContent; btn.disabled = true; setErr("");
+    const reset = () => { btn.disabled = false; btn.textContent = label; };
+    try {
+      btn.textContent = "Please wait…";
+      const lines = cartLines().map(l => l.size ? { id:l.id, size:l.size, qty:l.qty } : { id:l.id, qty:l.qty });
+      const res = await api.placeOrder({ ...S.customer, items: lines, idem: orderKey(lines) });
+      if (!res.rp){ finishOrder(res); return; }   // demo mode, or already paid
+      await loadCheckout();
+      const paid = await new Promise((resolve, reject) => {
+        const rz = new Razorpay({
+          key: res.rp.key, amount: res.rp.amount, currency: "INR", order_id: res.rp.orderId, name: CONFIG.PAYEE, description: "Order " + res.id,
+          prefill: { name: S.customer.name, contact: S.customer.phone }, theme: { color: "#1B5E36" },
+          handler: r => resolve(r), modal: { ondismiss: () => reject(new Error("dismissed")) }
+        });
+        rz.on("payment.failed", () => {});   // the checkout shows its own message and lets the customer retry
+        rz.open();
+      });
+      btn.textContent = t("confirming");
+      let done = res;
+      for (let i = 0; i < 3; i++){
+        try { done = { ...res, ...(await api.payConfirm({ id:res.id, rpOrderId:paid.razorpay_order_id, rpPaymentId:paid.razorpay_payment_id, rpSignature:paid.razorpay_signature })) }; break; }
+        catch(e){ await new Promise(r => setTimeout(r, 1200)); }   // money was taken: keep trying, and the server also checks with Razorpay by itself
+      }
+      delete done.rp; finishOrder(done);
+    } catch(e){
+      reset();
+      setErr(e && e.message === "dismissed" ? t("payNotDone") : niceError(e && e.message, "Couldn't start the payment. Try again."));
+    } finally { S.placing = false; }
+  },
   async placeOrder(_, __, btn){
     if (S.placing) return;
     S.placing = true;
@@ -2403,10 +2466,7 @@ const ACTIONS = {
     try {
       const lines = cartLines().map(l => l.size ? { id:l.id, size:l.size, qty:l.qty } : { id:l.id, qty:l.qty });
       const res = await api.placeOrder({ ...S.customer, items: lines, idem: orderKey(lines) });
-      LS.set("fs_okey", null);
-      const oi = myItems(); oi[res.id] = cartLines().map(l => ({ k:l.key, n:l.s ? l.name : l.f.name, q:l.qty, u:l.unit })); Object.keys(oi).slice(0, -30).forEach(k => delete oi[k]); LS.set("fs_oitems", oi);
-      S.myOrders = [res.id, ...S.myOrders.filter(x => x !== res.id)].slice(0, 20); LS.set("fs_my", S.myOrders);
-      S.lastOrder = res; S.cart = {}; S.mine = null; S.view = "done"; render();
+      finishOrder(res);
     } catch(e){
       setErr(niceError(e && e.message, "Couldn't book the order. Try again."));   // the cart is kept
       btn.disabled = false; btn.textContent = "Try again";

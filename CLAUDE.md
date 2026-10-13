@@ -13,6 +13,7 @@ FruitSlot is a fruit pre-order and shop management PWA for two shops in Eluru: *
 - Customers pre-order today and pick up tomorrow.
 - Orders close at 9 PM IST.
 - Payment is upfront by UPI. There is no UTR: the owner matches the amount and time against PhonePe, then marks Payment received / Not received.
+- Optional online payment: `CONFIG.GATEWAY` (default off) switches customers to Razorpay Checkout. `Code.gs` creates the Razorpay order from sheet prices, marks the order Paid only after the signature check or a Razorpay lookup, and hides `unpaid` orders from the owner. Keys live in Script properties, never in `index.html`.
 
 ## Owner tabs
 

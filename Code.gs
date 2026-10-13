@@ -4,6 +4,7 @@
  * 2. Run setup() once (allow access).
  * 3. Project Settings > Script properties: add OWNER_KEY = a secret only you know.
  *    For the AI assistant, also add ANTHROPIC_API_KEY (and optionally AI_MODEL, default claude-haiku-4-5-20251001).
+ *    For online payment (Razorpay), also add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET (test keys first, then live keys).
  * 4. Deploy > New deployment > Web app. Execute as: Me. Who has access: Anyone. Copy the URL into CONFIG.API_URL in index.html.
  */
 const CUTOFF_HOUR = 21;            // 9 PM IST, must match index.html
@@ -59,6 +60,7 @@ function handle_(p){
       case "photos":      return out_({ ok:true, data: photosOf_() });
       case "status":      return out_({ ok:true, data: statusOf_(String(p.ids || "").split(",").map(s => s.trim()).filter(String).slice(0, 20)) });
       case "order":       return out_({ ok:true, data: placeOrder_(p) });
+      case "payConfirm":  return out_({ ok:true, data: payConfirm_(p) });
       case "orders":      owner_(p.key); return out_({ ok:true, data: readOrders_() });
       case "updateOrder": owner_(p.key); return out_({ ok:true, data: updateOrder_(p.id, p.status) });
       case "book":        owner_(p.key); return out_({ ok:true, data: readBook_() });
@@ -148,10 +150,64 @@ function dateStr_(v){
   return v instanceof Date ? Utilities.formatDate(v, "Asia/Kolkata", "yyyy-MM-dd") : String(v).slice(0, 10);
 }
 function readOrders_(){
-  return rows_("Orders", ORDER_COLS).slice(-1000).map(o => ({
+  reconcileUnpaid_(10);
+  return rows_("Orders", ORDER_COLS).slice(-1000).filter(o => String(o.status) !== "unpaid").map(o => ({   // orders still waiting for online payment are not shown to the owner
     id:String(o.id), created:String(o.created), name:String(o.name), phone:String(o.phone), shop:String(o.shop),
-    pickupDate: dateStr_(o.pickupDate), items: JSON.parse(o.items || "[]"), total:Number(o.total), utr:String(o.utr || ""), status:String(o.status)
+    pickupDate: dateStr_(o.pickupDate), items: JSON.parse(o.items || "[]"), total:Number(o.total), utr:"", status:String(o.status)
   }));
+}
+/* ===== Online payment (Razorpay) =====
+   The server works out the total from the sheet's prices, creates a Razorpay order for exactly that amount, and only marks an
+   order Paid after Razorpay says so: the signature from the checkout is checked with the secret key, or Razorpay is asked directly.
+   The Razorpay order id is kept in the Orders sheet's utr column. The secret key lives only in Script properties. */
+function rpKeys_(){
+  const pr = PropertiesService.getScriptProperties(), id = pr.getProperty("RAZORPAY_KEY_ID"), secret = pr.getProperty("RAZORPAY_KEY_SECRET");
+  return id && secret ? { id:id, secret:secret } : null;
+}
+function rpCall_(method, path, payload){
+  const k = rpKeys_(); if (!k) throw bad_("Online payment isn't switched on yet. Please visit the shop to pay.");
+  const opt = { method:method, muteHttpExceptions:true, headers:{ Authorization:"Basic " + Utilities.base64Encode(k.id + ":" + k.secret) } };
+  if (payload){ opt.contentType = "application/json"; opt.payload = JSON.stringify(payload); }
+  const res = UrlFetchApp.fetch("https://api.razorpay.com/v1/" + path, opt), code = res.getResponseCode();
+  let body = {}; try { body = JSON.parse(res.getContentText()); } catch (e) {}
+  if (code >= 400) throw new Error("Razorpay " + code + ": " + String((body.error && body.error.description) || res.getContentText()).slice(0, 200));
+  return body;
+}
+function payConfirm_(p){
+  const k = rpKeys_(); if (!k) throw bad_("Online payment isn't switched on yet.");
+  const id = String(p.id || ""), orderId = String(p.rpOrderId || ""), payId = String(p.rpPaymentId || ""), sig = String(p.rpSignature || "");
+  if (!/^[A-Za-z0-9_]{6,40}$/.test(orderId) || !/^[A-Za-z0-9_]{6,40}$/.test(payId) || !/^[a-f0-9]{64}$/.test(sig)) throw bad_("Payment details look wrong.");
+  const want = Utilities.computeHmacSha256Signature(orderId + "|" + payId, k.secret).map(b => ("0" + (b & 255).toString(16)).slice(-2)).join("");
+  if (want !== sig) throw bad_("Payment could not be verified. If money was taken, show your payment screen at the shop.");
+  const sh = sheet_("Orders"), n = sh.getLastRow();
+  if (n < 2) throw bad_("Order not found.");
+  const rows = sh.getRange(2, 1, n - 1, ORDER_COLS.length).getValues();
+  for (let i = rows.length - 1; i >= 0; i--){
+    if (String(rows[i][0]) !== id) continue;
+    if (String(rows[i][8]) !== orderId) throw bad_("Payment doesn't match this order.");
+    if (String(rows[i][9]) === "unpaid") sh.getRange(i + 2, ORDER_COLS.indexOf("status") + 1).setValue("paid");
+    cache_().remove(STATUS_KEY + id);
+    return { id:id, status: String(rows[i][9]) === "unpaid" ? "paid" : String(rows[i][9]) };
+  }
+  throw bad_("Order not found.");
+}
+/* Asks Razorpay about orders still "unpaid" (the customer paid but closed the page before we heard). Newest first, at most `max` per call. */
+function reconcileUnpaid_(max, onlyIds){
+  if (!rpKeys_()) return;
+  const sh = sheet_("Orders"), n = sh.getLastRow(); if (n < 2) return;
+  const first = Math.max(2, n - 199), rows = sh.getRange(first, 1, n - first + 1, ORDER_COLS.length).getValues(), cutoff = Date.now() - 36 * 3600 * 1000;
+  let done = 0;
+  for (let i = rows.length - 1; i >= 0 && done < max; i--){
+    const r = rows[i];
+    if (String(r[9]) !== "unpaid" || !/^order_/.test(String(r[8])) || (onlyIds && onlyIds.indexOf(String(r[0])) < 0)) continue;
+    if (new Date(String(r[1])).getTime() < cutoff) continue;
+    done++;
+    try {
+      if (rpCall_("get", "orders/" + encodeURIComponent(String(r[8]))).status === "paid"){
+        sh.getRange(first + i, ORDER_COLS.indexOf("status") + 1).setValue("paid"); cache_().remove(STATUS_KEY + String(r[0]));
+      }
+    } catch (e) { logError_("reconcile", e); }
+  }
 }
 function pickupDate_(){
   const now = new Date();
@@ -191,6 +247,12 @@ function placeOrder_(p){
   });
   const total = items.reduce((s, i) => s + i.qty * i.price, 0);
   const created = new Date().toISOString(), pickup = pickupDate_(), itemsJson = JSON.stringify(items);
+  let rp = null;   // online payment: create the Razorpay order for exactly this total before taking an order number
+  if (p.gateway){
+    if (!rpKeys_()) throw bad_("Online payment isn't switched on yet. Please visit the shop to pay.");
+    const o = rpCall_("post", "orders", { amount: Math.round(total * 100), currency: "INR", receipt: (idem || Utilities.getUuid()).slice(0, 40), notes: { name: name, phone: phone, shop: p.shop } });
+    rp = { key: rpKeys_().id, orderId: o.id, amount: o.amount };
+  }
 
   // 2. The locked part: check the key again, take the next number, append one row.
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
@@ -202,8 +264,9 @@ function placeOrder_(p){
     seq += 1;
     props.setProperty("ORDER_SEQ", String(seq));
     const id = "FS" + seq;
-    sh.appendRow([id, created, name, phone, p.shop, pickup, itemsJson, total, "", "pending"]);
-    const res = { id:id, total:total, pickupDate:pickup, shop:p.shop, status:"pending" };
+    sh.appendRow([id, created, name, phone, p.shop, pickup, itemsJson, total, rp ? rp.orderId : "", rp ? "unpaid" : "pending"]);
+    const res = { id:id, total:total, pickupDate:pickup, shop:p.shop, status: rp ? "unpaid" : "pending" };
+    if (rp) res.rp = rp;
     if (idem) cache.put(IDEM_KEY + idem, JSON.stringify(res), IDEM_TTL);
     return res;
   } finally { lock.releaseLock(); }
@@ -211,6 +274,7 @@ function placeOrder_(p){
 /* Looks up only the requested ids, in the last 300 rows, and caches each answer for 20 seconds. */
 function statusOf_(ids){
   if (!ids.length) return [];
+  reconcileUnpaid_(5, ids);
   const c = cache_(), got = c.getAll(ids.map(id => STATUS_KEY + id)), found = {};
   const todo = ids.filter(id => { const v = got[STATUS_KEY + id]; if (v) { found[id] = JSON.parse(v); return false; } return true; });
   if (todo.length){

@@ -56,6 +56,18 @@ To add a photo file: save it as `img/<fruit-id>.webp` and upload it with the oth
 ## "About" lines
 Tap a fruit on the customer screen to show a short About line. The lines live in the `ABOUT` list in `index.html`, keyed by fruit id. A fruit with no entry shows nothing.
 
+## Online payment with Razorpay (optional, turn on when ready)
+With this on, the customer taps **Pay ₹X**, pays in the Razorpay window (PhonePe, Google Pay, Paytm, card or net banking), and the order becomes **Paid** by itself. You no longer match payments by hand. Orders that were started but not paid are hidden from you.
+
+1. Create a Razorpay account at razorpay.com and finish the business verification (KYC). You can try everything first with **Test mode** keys.
+2. In the Razorpay dashboard, open **Account & Settings > API keys** and generate a key. You get a Key ID (starts with `rzp_test_` or `rzp_live_`) and a Key Secret.
+3. In Apps Script, open **Project Settings > Script properties** and add `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`.
+4. Paste the latest `Code.gs`, then **Deploy > Manage deployments > Edit > New version**. Apps Script will ask you to allow it to connect to an outside service. Allow it.
+5. In `index.html`, change `GATEWAY: false` to `GATEWAY: true`, and upload it to GitHub.
+6. With Test keys, place an order and pay with Razorpay's test UPI ID `success@razorpay`. The order should show Paid. When happy, swap in the Live keys (step 3) and deploy a new version again.
+
+Never put the Key Secret in `index.html`. If a customer pays and closes the page before it finishes, the app asks Razorpay and marks the order Paid the next time the owner screen or the customer's orders refresh. Refunds for rejected orders are done in the Razorpay dashboard. Razorpay charges a fee on each payment; see their pricing page.
+
 ## Good to know
 - Prices always come from the Sheet, so nobody can change the price on their phone.
 - The same UTR can't be used for two orders.
