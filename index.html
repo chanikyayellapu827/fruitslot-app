@@ -175,6 +175,8 @@ legend{font-weight:600;margin-bottom:6px;padding:0}
 .choice:has(input:checked){border-color:var(--leaf);background:color-mix(in srgb,var(--leaf) 10%,transparent)}
 .choice input{accent-color:var(--leaf);width:18px;height:18px}
 .err{color:var(--bad);min-height:1.3em;margin:4px 0 10px;font-weight:600}
+.paylink.ghost{color:inherit;box-shadow:none}
+.paylink{display:flex;align-items:center;justify-content:center;text-decoration:none;margin-top:16px;text-align:center}
 .amount{font-size:2.7rem;font-weight:700;margin:0;color:var(--pom);line-height:1}
 .steps{padding-left:22px;margin:16px 0 8px}
 .steps li{margin-bottom:14px;padding-left:4px}
@@ -701,6 +703,7 @@ const I18N = {
     noneCat:"Nothing in this group today", noneCatS:"Try another group.", noneAll:"No fruits on sale right now", noneAllS:"Check back this evening.",
     loadFail:"Couldn't load the fruit list. Try again.", tryAgain:"Try again", myOrders:"My orders", back:"Back", yourOrder:"Your order", yourName:"Your name", mobile:"Mobile number",
     pickAt:"Pick up at", pickDay:"Pickup day", toPay:"Continue to payment", payTo:"Pay to book", copy:"Copy", payStep1:"Copy our UPI ID", payStep2:"Pay {0} in PhonePe, Google Pay or Paytm.",
+    payUpi:"Pay {0} with UPI app", payHint:"Opens PhonePe, Google Pay or Paytm with the amount already filled in.", otherWays:"Other ways to pay", afterPay:"Paid? Tap below to book your order.",
     showQR:"Show QR code", qrNote:"Someone else can scan this from their phone. On your own phone, take a screenshot and use \"scan from gallery\" in your UPI app.",
     bookBtn:"I've paid {0}, book my order", payNote:"Pay from your UPI app first. We confirm your payment before pickup.", booked:"Order {0} booked", checking:"We're checking your payment.",
     pickupOn:"Pick up on {0} at {1}.", showNo:"Show this order number at the counter.", seeOrders:"See my orders", orderMore:"Order more fruit",
@@ -717,6 +720,7 @@ const I18N = {
     noneCat:"ఈ రోజు ఇందులో ఏమీ లేవు", noneCatS:"వేరే విభాగం చూడండి.", noneAll:"ఇప్పుడు అమ్మకానికి పండ్లు లేవు", noneAllS:"సాయంత్రం మళ్ళీ చూడండి.",
     loadFail:"పండ్ల జాబితా రాలేదు. మళ్ళీ ప్రయత్నించండి.", tryAgain:"మళ్ళీ ప్రయత్నించండి", myOrders:"నా ఆర్డర్లు", back:"వెనక్కి", yourOrder:"మీ ఆర్డర్", yourName:"మీ పేరు", mobile:"మొబైల్ నంబర్",
     pickAt:"ఎక్కడ తీసుకుంటారు", pickDay:"తీసుకునే రోజు", toPay:"చెల్లింపుకు వెళ్ళండి", payTo:"చెల్లించి బుక్ చేయండి", copy:"కాపీ", payStep1:"మా UPI ID కాపీ చేయండి", payStep2:"ఫోన్‌పే, గూగుల్ పే లేదా పేటీఎం లో {0} చెల్లించండి.",
+    payUpi:"UPI యాప్‌తో {0} చెల్లించండి", payHint:"ఫోన్‌పే, గూగుల్ పే లేదా పేటీఎం మొత్తంతో సహా తెరుచుకుంటుంది.", otherWays:"ఇతర చెల్లింపు మార్గాలు", afterPay:"చెల్లించారా? ఆర్డర్ బుక్ చేయడానికి కింద నొక్కండి.",
     showQR:"QR కోడ్ చూపించు", qrNote:"వేరొకరు తమ ఫోన్‌తో స్కాన్ చేయవచ్చు. మీ ఫోన్‌లో అయితే స్క్రీన్‌షాట్ తీసి UPI యాప్‌లో గ్యాలరీ నుండి స్కాన్ చేయండి.",
     bookBtn:"{0} చెల్లించాను, ఆర్డర్ బుక్ చేయండి", payNote:"ముందు UPI యాప్ నుండి చెల్లించండి. తీసుకునే ముందు మీ చెల్లింపును మేము నిర్ధారిస్తాం.", booked:"ఆర్డర్ {0} బుక్ అయింది", checking:"మీ చెల్లింపును పరిశీలిస్తున్నాం.",
     pickupOn:"{0} న {1} లో తీసుకోండి.", showNo:"కౌంటర్ వద్ద ఈ ఆర్డర్ నంబర్ చూపించండి.", seeOrders:"నా ఆర్డర్లు చూడండి", orderMore:"ఇంకా పండ్లు ఆర్డర్ చేయండి",
@@ -1222,23 +1226,26 @@ function viewCheckout(){
     <button class="primary wide" data-act="toPay">${esc(t("toPay"))}</button>
   </section>`;
 }
+function upiUrl(){
+  const note = ("FruitSlot " + (S.customer.name || "")).trim().slice(0, 40);
+  return `upi://pay?pa=${encodeURIComponent(CONFIG.UPI_ID)}&pn=${encodeURIComponent(CONFIG.PAYEE)}&am=${cartTotal().toFixed(2)}&cu=INR&tn=${encodeURIComponent(note)}`;
+}
 function viewPay(){
-  const amt = cartTotal();
+  const amt = cartTotal(), touch = matchMedia("(pointer:coarse)").matches, tried = !!S.upiTried;
   return `
   <header class="top"><button class="link" data-act="go" data-id="checkout">${esc(t("back"))}</button><span class="title">${esc(t("payTo"))}</span><span style="width:48px"></span></header>
   <section class="card">
     <p class="amount">${rupee(amt)}</p>
-    <ol class="steps">
-      <li>${esc(t("payStep1"))}
-        <div class="upi"><code>${esc(CONFIG.UPI_ID)}</code><button class="ghost" data-act="copyUpi">${esc(t("copy"))}</button></div></li>
-      <li>${esc(t("payStep2", rupee(amt)))}</li>
-    </ol>
-    <details><summary>${esc(t("showQR"))}</summary>
+    <a class="${tried ? "ghost" : "primary"} wide big paylink" id="paylink" data-act="payUpi" href="${esc(upiUrl())}">${esc(t("payUpi", rupee(amt)))}</a>
+    <p class="note" style="margin:8px 0 16px">${esc(t("payHint"))}</p>
+    <p class="note afterpay" id="afterpay" ${tried ? "" : "hidden"}><strong>${esc(t("afterPay"))}</strong></p>
+    <p class="err" id="err" role="alert"></p>
+    <button class="${tried ? "primary" : "ghost"} wide big" id="bookbtn" data-act="placeOrder">${esc(t("bookBtn", rupee(amt)))}</button>
+    <details style="margin-top:16px" ${touch ? "" : "open"}><summary>${esc(t("otherWays"))}</summary>
+      <div class="upi"><code>${esc(CONFIG.UPI_ID)}</code><button class="ghost" data-act="copyUpi">${esc(t("copy"))}</button></div>
       <div id="qr"></div>
       <p class="note">${esc(t("qrNote"))}</p>
     </details>
-    <p class="err" id="err" role="alert"></p>
-    <button class="primary wide big" data-act="placeOrder">${esc(t("bookBtn", rupee(amt)))}</button>
     <p class="note" style="margin-top:12px">${esc(t("payNote"))}</p>
   </section>`;
 }
@@ -2272,8 +2279,7 @@ function render(){
 }
 function drawQR(){
   const el = document.getElementById("qr"); if (!el) return;
-  const amt = cartTotal().toFixed(2);
-  const text = `upi://pay?pa=${encodeURIComponent(CONFIG.UPI_ID)}&pn=${encodeURIComponent(CONFIG.PAYEE)}&am=${amt}&cu=INR`;
+  const text = upiUrl();
   if (window.QRCode){ try { new QRCode(el, { text, width:190, height:190, correctLevel: QRCode.CorrectLevel.M }); return; } catch(e){} }
   el.outerHTML = `<p class="note">QR code can't load right now. Use the UPI ID above.</p>`;
 }
@@ -2362,7 +2368,12 @@ const ACTIONS = {
     if (!/^[6-9]\d{9}$/.test(phone)) return setErr("Enter a 10-digit mobile number.");
     if (!shop) return setErr("Choose a shop to pick up from.");
     S.customer = { name, phone, shop }; LS.set("fs_me", S.customer);
-    S.view = "pay"; render();
+    S.upiTried = false; S.view = "pay"; render();
+  },
+  payUpi(){   // the link itself opens the UPI app; we just make "book my order" the next step
+    S.upiTried = true;
+    const a = document.getElementById("afterpay"), b = document.getElementById("bookbtn"), l = document.getElementById("paylink");
+    if (a) a.hidden = false; if (b) b.className = "primary wide big"; if (l){ l.classList.remove("primary"); l.classList.add("ghost"); }
   },
   async copyUpi(){
     try { await navigator.clipboard.writeText(CONFIG.UPI_ID); toast("UPI ID copied"); }
@@ -2634,6 +2645,10 @@ async function leavePrices(run){
   } else { S.editFruits = null; S.editGone = null; S.fruitsDirty = false; }
   run();
 }
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible" || S.view !== "pay" || !S.upiTried) return;
+  const b = document.getElementById("bookbtn"); if (b){ try { b.scrollIntoView({ block:"center", behavior:"smooth" }); } catch(e){} toast(t("afterPay")); }
+});
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const fn = ACTIONS[b.dataset.act]; if (!fn) return;
