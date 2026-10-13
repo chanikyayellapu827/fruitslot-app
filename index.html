@@ -180,6 +180,7 @@ legend{font-weight:600;margin-bottom:6px;padding:0}
 .done .link{min-height:48px;display:inline-flex;align-items:center}
 .done .bigtotal{text-align:center;font-size:2.4rem}
 .done .primary.big,.done .ghost.big{min-height:56px;font-size:1.05rem}
+.done .paytitle{margin:0;font-size:1.15rem}
 .done .appbtns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .done .appbtns a{display:flex;align-items:center;justify-content:center;min-height:48px;padding:0 6px;font-size:.9rem;text-align:center;text-decoration:none;color:inherit}
 .done .qrfold summary{min-height:48px;display:flex;align-items:center;font-weight:700;cursor:pointer}
@@ -602,7 +603,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 const CONFIG = {
   API_URL: "https://script.google.com/macros/s/AKfycbxBxQ9CNVKYOlU_fNnQaBL_N2yz9zhZ5rg92KEKqT5k-IN7DS_ZQTSOB_2LMLLJ7wji/exec",              // paste your Google Apps Script web app URL here. Empty = demo mode (orders stay on this phone only)
   UPI_ID: "yellapuchanikya369@ybl",    // the UPI ID customers pay to – check this is correct
-  UPI_LINK: true,              // true = "Pay with UPI" opens the customer's UPI app. Set false if the UPI app refuses link payments to this ID (PhonePe business QR IDs starting with Q do); the button then just shows the QR
+  UPI_LINK: false,             // false = customers pay by QR code or by typing the UPI ID (UPI apps often decline link payments to a personal UPI ID "for security reasons"). true = also show Pay with UPI, Google Pay, PhonePe and Paytm link buttons
   PAYEE: "FruitSlot",
   CUTOFF_HOUR: 21,             // orders close at 9 PM for next-day pickup
   SHOPS: [
@@ -722,7 +723,7 @@ const I18N = {
     noneCat:"Nothing in this group today", noneCatS:"Try another group.", noneAll:"No fruits on sale right now", noneAllS:"Check back this evening.",
     loadFail:"Couldn't load the fruit list. Try again.", tryAgain:"Try again", myOrders:"My orders", back:"Back", yourOrder:"Your order", yourName:"Your name", mobile:"Mobile number",
     pl_qrpay:"Pay with QR", pl_shop:"Pay at shop", pl_paid:"I've paid", pl_scan:"Scan this QR code with PhonePe, Google Pay or Paytm on another phone. On this phone, copy the UPI ID and pay it in your UPI app.", pl_pickup2:"Okay! Pay at the shop when you pick up. Your order stays pending until then.",
-    pl_foldqr:"Paying from another phone? Show QR", pl_scan2:"Scan this QR code with any UPI app on the other phone.", pl_noapp2:"The app didn't open. Try another app, show the QR, or copy the UPI ID below.",
+    pl_qrid:"Pay with QR or UPI ID", pl_scan3:"Scan this QR code with any UPI app on another phone. On this phone, copy the UPI ID and pay it in your UPI app.", pl_foldqr:"Paying from another phone? Show QR", pl_scan2:"Scan this QR code with any UPI app on the other phone.", pl_noapp2:"The app didn't open. Try another app, show the QR, or copy the UPI ID below.",
     pl_place:"Place order", pl_pay:"Pay {0} with UPI", pl_later:"Pay at pickup instead", pl_qr:"Show QR", pl_qrnote:"Scan this QR code with any UPI app on another phone.", pl_id:"UPI ID", pl_thanks:"Thanks! We'll confirm your payment shortly.", pl_pickup:"Okay! Pay when you pick up. Your order stays pending until then.", pl_noapp:"The UPI app didn't open. Scan the QR code from another phone, or pay to the UPI ID below.", pl_copied:"UPI ID copied",
     pickAt:"Pick up at", pickDay:"Pickup day", toPay:"Continue to payment", payTo:"Pay to book", copy:"Copy", payStep1:"Copy our UPI ID", payStep2:"Pay {0} in PhonePe, Google Pay or Paytm.",
     payUpi:"Pay {0} with UPI app", payHint:"Opens PhonePe, Google Pay or Paytm with the amount already filled in.", otherWays:"Other ways to pay", afterPay:"Paid? Tap below to book your order.",
@@ -742,7 +743,7 @@ const I18N = {
     noneCat:"ఈ రోజు ఇందులో ఏమీ లేవు", noneCatS:"వేరే విభాగం చూడండి.", noneAll:"ఇప్పుడు అమ్మకానికి పండ్లు లేవు", noneAllS:"సాయంత్రం మళ్ళీ చూడండి.",
     loadFail:"పండ్ల జాబితా రాలేదు. మళ్ళీ ప్రయత్నించండి.", tryAgain:"మళ్ళీ ప్రయత్నించండి", myOrders:"నా ఆర్డర్లు", back:"వెనక్కి", yourOrder:"మీ ఆర్డర్", yourName:"మీ పేరు", mobile:"మొబైల్ నంబర్",
     pl_qrpay:"QR తో చెల్లించండి", pl_shop:"షాపులో చెల్లిస్తాను", pl_paid:"చెల్లించాను", pl_scan:"మరో ఫోన్‌లో ఫోన్‌పే, గూగుల్ పే లేదా పేటీఎంతో ఈ QR కోడ్ స్కాన్ చేయండి. ఈ ఫోన్‌లో అయితే UPI ID కాపీ చేసి మీ UPI యాప్‌లో చెల్లించండి.", pl_pickup2:"సరే! తీసుకునేటప్పుడు షాపులో చెల్లించండి. అప్పటి వరకు మీ ఆర్డర్ పెండింగ్‌లో ఉంటుంది.",
-    pl_foldqr:"మరో ఫోన్ నుండి చెల్లిస్తున్నారా? QR చూపించు", pl_scan2:"మరో ఫోన్‌లో ఏదైనా UPI యాప్‌తో ఈ QR కోడ్ స్కాన్ చేయండి.", pl_noapp2:"యాప్ తెరుచుకోలేదు. మరో యాప్ ప్రయత్నించండి, QR చూపించండి, లేదా కింద UPI ID కాపీ చేయండి.",
+    pl_qrid:"QR లేదా UPI ID తో చెల్లించండి", pl_scan3:"మరో ఫోన్‌లో ఏదైనా UPI యాప్‌తో ఈ QR కోడ్ స్కాన్ చేయండి. ఈ ఫోన్‌లో అయితే UPI ID కాపీ చేసి మీ UPI యాప్‌లో చెల్లించండి.", pl_foldqr:"మరో ఫోన్ నుండి చెల్లిస్తున్నారా? QR చూపించు", pl_scan2:"మరో ఫోన్‌లో ఏదైనా UPI యాప్‌తో ఈ QR కోడ్ స్కాన్ చేయండి.", pl_noapp2:"యాప్ తెరుచుకోలేదు. మరో యాప్ ప్రయత్నించండి, QR చూపించండి, లేదా కింద UPI ID కాపీ చేయండి.",
     pl_place:"ఆర్డర్ చేయండి", pl_pay:"UPI తో {0} చెల్లించండి", pl_later:"బదులుగా తీసుకునేటప్పుడు చెల్లిస్తాను", pl_qr:"QR చూపించు", pl_qrnote:"మరో ఫోన్‌లో ఏదైనా UPI యాప్‌తో ఈ QR కోడ్ స్కాన్ చేయండి.", pl_id:"UPI ID", pl_thanks:"ధన్యవాదాలు! మీ చెల్లింపును త్వరలో నిర్ధారిస్తాం.", pl_pickup:"సరే! తీసుకునేటప్పుడు చెల్లించండి. అప్పటి వరకు మీ ఆర్డర్ పెండింగ్‌లో ఉంటుంది.", pl_noapp:"UPI యాప్ తెరుచుకోలేదు. మరో ఫోన్‌తో QR కోడ్ స్కాన్ చేయండి లేదా కింద UPI ID కి చెల్లించండి.", pl_copied:"UPI ID కాపీ అయింది",
     pickAt:"ఎక్కడ తీసుకుంటారు", pickDay:"తీసుకునే రోజు", toPay:"చెల్లింపుకు వెళ్ళండి", payTo:"చెల్లించి బుక్ చేయండి", copy:"కాపీ", payStep1:"మా UPI ID కాపీ చేయండి", payStep2:"ఫోన్‌పే, గూగుల్ పే లేదా పేటీఎం లో {0} చెల్లించండి.",
     payUpi:"UPI యాప్‌తో {0} చెల్లించండి", payHint:"ఫోన్‌పే, గూగుల్ పే లేదా పేటీఎం మొత్తంతో సహా తెరుచుకుంటుంది.", otherWays:"ఇతర చెల్లింపు మార్గాలు", afterPay:"చెల్లించారా? ఆర్డర్ బుక్ చేయడానికి కింద నొక్కండి.",
@@ -1261,6 +1262,12 @@ function viewDone(){
   const o = S.lastOrder, st = S.donePay || "", coarse = matchMedia("(pointer:coarse)").matches, link = CONFIG.UPI_LINK;
   const payBlock = st === "thanks" ? `<p class="paymsg ok" role="status">${esc(t("pl_thanks"))}</p>`
     : st === "shop" ? `<p class="paymsg" role="status">${esc(t("pl_pickup2"))}</p>`
+    : !link ? `<h2 class="paytitle">${esc(t("pl_qrid"))}</h2>
+      <div class="qrbox"><div id="qr" role="img" aria-label="UPI QR code"></div>
+        <p class="note">${esc(t("pl_scan3"))}</p>
+        <div class="upi"><span class="note">${esc(t("pl_id"))}</span> <code>${esc(CONFIG.UPI_ID)}</code><button class="ghost" data-act="copyUpi">${esc(t("copy"))}</button></div></div>
+      <button class="primary wide big" data-act="payDone">${esc(t("pl_paid"))}</button>
+      <button class="ghost wide big" data-act="payShop">${esc(t("pl_shop"))}</button>`
     : `${link ? `<a class="primary wide big paylink" id="paylink" data-act="payApp" href="${esc(upiUrl(o))}">${esc(t("pl_pay", exactRupee(o.total)))}</a>
       <div class="appbtns">${[["gpay", "Google Pay"], ["phonepe", "PhonePe"], ["paytm", "Paytm"]].map(([k, n]) => `<a class="ghost" data-act="payApp" href="${esc(upiUrl(o, k))}">${n}</a>`).join("")}</div>` : ""}
       <button class="ghost wide big" data-act="payShop">${esc(t("pl_shop"))}</button>
