@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>FruitSlot Eluru – order today, pick up fresh tomorrow</title>
-<meta name="theme-color" content="#F7F2E8" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#111512" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F2F0EB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1714" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Inter:wght@400..700&family=Noto+Sans+Telugu:wght@400..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&family=Noto+Sans+Telugu:wght@400..700&display=swap" rel="stylesheet">
 <style>
 :root{
   /* colour */
@@ -702,6 +702,129 @@ h1,h2,h3{font-weight:600}
 /* owner screens inherit the palette, with calmer chrome */
 .tabbar{background:color-mix(in srgb,var(--surface) 90%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
 .pagetitle{font-weight:500;letter-spacing:-.025em}
+/* ===== Fresh market layer: cream canvas, layered greens, gold only for savings, full pills, flat surfaces =====
+   Direction from a retail-flagship DESIGN.md (awesome-design-md), checked against Taste Skill house rules
+   (no gradients, glass or decorative shapes; shadows only on what floats) and the Web Interface Guidelines. */
+:root{
+  --bg:#F2F0EB;--surface:#FFFFFF;--surface-2:#EDEBE9;--ink:#1D1D1B;--muted:#5B5953;--line:#E2DFD8;
+  --leaf:#00754A;--on-leaf:#FFFFFF;--brand:#006241;--house:#1E3932;--on-house:#FFFFFF;--house-soft:rgba(255,255,255,.74);
+  --mint:#D4E9E2;--tag:#CBA258;--gold-ink:#7A5A1E;--gold-wash:#FAF6EE;
+  --ok:#0B6B45;--ok-bg:#D4E9E2;--cta:var(--leaf);--on-cta:#FFFFFF;
+  --shadow-1:none;--shadow-2:0 0 6px rgba(0,0,0,.18),0 8px 14px rgba(0,0,0,.14);
+  --serif:"Manrope","Noto Sans Telugu",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --sans:"Manrope","Noto Sans Telugu",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --r-card:16px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E1714;--surface:#16211D;--surface-2:#1F2D28;--ink:#F2F0EB;--muted:#A7B2AC;--line:#2A3833;
+  --leaf:#4CC38A;--on-leaf:#06140E;--brand:#7FD8AE;--house:#1E3932;--mint:#163126;--tag:#D9B66F;--gold-ink:#E8CD93;--gold-wash:#2A2417;
+  --ok:#6FD3A0;--ok-bg:#163126;--on-cta:#06140E;--shadow-2:0 0 6px rgba(0,0,0,.5),0 10px 24px rgba(0,0,0,.45)}}
+:root[data-theme="dark"]{
+  --bg:#0E1714;--surface:#16211D;--surface-2:#1F2D28;--ink:#F2F0EB;--muted:#A7B2AC;--line:#2A3833;
+  --leaf:#4CC38A;--on-leaf:#06140E;--brand:#7FD8AE;--house:#1E3932;--mint:#163126;--tag:#D9B66F;--gold-ink:#E8CD93;--gold-wash:#2A2417;
+  --ok:#6FD3A0;--ok-bg:#163126;--on-cta:#06140E;--shadow-2:0 0 6px rgba(0,0,0,.5),0 10px 24px rgba(0,0,0,.45)}
+body{font-feature-settings:normal;letter-spacing:-.01em}
+:lang(te) body{letter-spacing:0}
+h1,h2,h3,.fn,.pagetitle{text-wrap:balance}
+button,a,.in,summary,label{touch-action:manipulation}
+.mark,.hero h1,.fn,.sheet h2,.pagetitle,.done h1,.top .title,.estate h2,.ohdr .mark,.ocard .ohead strong{font-family:var(--sans)}
+/* header */
+.mark{font-weight:800;font-size:1.55rem;letter-spacing:-.04em;color:var(--brand)}
+.town{font-size:.82rem;font-weight:600;letter-spacing:0;text-transform:none}
+.ibtn,.langsw{box-shadow:none;background:var(--surface)}
+.langsw button[aria-pressed="true"]{background:var(--house);color:var(--on-house)}
+@media (hover:hover){.ibtn:hover{background:var(--surface-2)}}
+/* hero: one deep-green band with the day's fruit */
+.hero{background:var(--house);color:var(--on-house);border:0;border-radius:var(--r-l);padding:var(--s5);box-shadow:none;display:flex;flex-direction:column;gap:var(--s4)}
+.hero::after{content:none}
+.hero h1{font-weight:800;font-size:clamp(2.05rem,9.6vw,3.6rem);line-height:1.02;letter-spacing:-.045em;max-width:11ch;margin:0 0 var(--s3);color:var(--on-house)}
+:lang(te) .hero h1{font-weight:700;font-size:clamp(1.6rem,7vw,2.4rem);line-height:1.3;letter-spacing:0;max-width:16ch}
+.hero p{color:var(--house-soft);font-size:1.02rem;max-width:34ch}
+.hero .clock{background:rgba(255,255,255,.12);color:var(--on-house);font-weight:700;font-variant-numeric:tabular-nums;margin-top:var(--s4)}
+.hero .clock::before{background:#7FD8AE}
+.hero-art{order:-1;display:flex;align-items:flex-end;height:84px}
+.hero-art .ha{width:84px;height:84px;filter:drop-shadow(0 10px 10px rgba(0,0,0,.28));flex:0 0 auto}
+.hero-art .ha2{width:68px;height:68px;margin-left:-14px}
+.hero-art .ha3{width:56px;height:56px;margin-left:-10px}
+@media (min-width:640px){
+  .hero{flex-direction:row;align-items:center;justify-content:space-between;padding:var(--s6) 48px}
+  .hero-art{order:0;position:relative;flex:0 0 auto;width:min(42%,380px);height:auto;aspect-ratio:1.25;display:block}
+  .hero-art .ha{position:absolute;margin:0}
+  .hero-art .ha1{width:66%;height:auto;right:22%;bottom:4%}
+  .hero-art .ha2{width:44%;height:auto;right:0;top:0}
+  .hero-art .ha3{width:36%;height:auto;left:0;top:6%}
+}
+/* how it works: plain text row, no boxes */
+.how{background:none;border:0;border-radius:0;gap:var(--s3);margin-top:var(--s4);padding:0 var(--s1)}
+.how li{background:none;border:0;box-shadow:none;padding:0;text-align:left;align-items:flex-start;gap:6px}
+.how .hi{width:auto;height:auto;border:0;background:none;color:var(--brand);margin:0}
+.how b{font-size:.9rem;font-weight:700}
+@media (min-width:640px){.how{padding:0 var(--s2)}.how li{justify-content:flex-start}}
+/* search and filters: solid, no frosted glass */
+.toolbar{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
+.searchbox .in{background:var(--surface);border:1px solid var(--line);box-shadow:none}
+.chip-btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:600}
+.chip-btn[aria-pressed="true"]{background:var(--house);border-color:var(--house);color:var(--on-house)}
+@media (hover:hover){.chip-btn:hover{border-color:var(--ink)}}
+/* fruit cards: white on cream, a tone step instead of shadows */
+.fcard{border-radius:var(--r-card);box-shadow:none}
+@media (hover:hover){.fcard:hover{transform:none;box-shadow:none}.fcard:hover .fimg svg.art{transform:scale(1.06)}}
+.fimg{margin:0;border-radius:0;background:color-mix(in srgb,var(--tint,#2F7D46) 13%,var(--surface-2))}
+.fimg::before{content:none}
+.fimg svg.art{width:58%;filter:drop-shadow(0 10px 12px rgba(0,0,0,.18))}
+.fbadge{background:var(--gold-wash);color:var(--gold-ink);border:1px solid var(--tag);-webkit-backdrop-filter:none;backdrop-filter:none;font-size:.74rem;font-weight:700;letter-spacing:0}
+.fbody{padding:var(--s3) var(--s3) var(--s4)}
+@media (min-width:640px){.fbody{padding:var(--s4)}}
+.fn{font-weight:700;font-size:1.18rem;letter-spacing:-.025em}
+.fsub{font-size:.78rem;letter-spacing:0}
+.deal small{font-size:.74rem;font-weight:600;letter-spacing:0;text-transform:none}
+.deal b{font-family:var(--sans);letter-spacing:-.035em}
+.deal .app b{color:var(--brand)}
+.deal .save{background:var(--mint);color:var(--ok);font-weight:700}
+.add,.primary{background:var(--leaf);color:var(--on-leaf);font-weight:700;box-shadow:none}
+.add:active,.primary:active,.ghost:active,.chip-btn:active,.cartbar>button:active{transform:scale(.95)}
+@media (hover:hover){.add:hover,.primary:hover{opacity:1;background:var(--brand)}}
+.ghost{background:transparent;border:1px solid var(--leaf);color:var(--leaf)}
+@media (hover:hover){.ghost:hover{background:color-mix(in srgb,var(--leaf) 9%,transparent)}}
+.stepper{border:1px solid var(--line);background:var(--surface-2)}
+.stepper button{color:var(--leaf);font-weight:700}
+/* floating cart bar: deep green pill, white action */
+.cartbar>button{background:var(--house);color:var(--on-house);-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:var(--shadow-2);transition:transform .15s var(--ease)}
+.cartbar .cn{background:var(--tag);color:#2A1D00;border-color:var(--house)}
+.cartbar .cgo{background:#FFFFFF;color:#00754A}
+/* cart sheet */
+.sheet{overscroll-behavior:contain}
+.sheet .sbody{overscroll-behavior:contain}
+.sheet h2{font-weight:800;letter-spacing:-.035em}
+.sheet footer{border-top:0;background:var(--surface-2)}
+.cl li{border-bottom-color:var(--line)}
+.cl .ci2{border-radius:12px}
+.savebox,.saved{background:var(--mint);color:var(--ok)}
+/* forms and receipts */
+.card,.ocard{border:0;box-shadow:none}
+.in{background:var(--surface-2)}
+.choice:has(input:checked){border-color:var(--leaf);background:color-mix(in srgb,var(--leaf) 8%,var(--surface))}
+.choice input,.switch input{accent-color:var(--leaf)}
+.done .amount,.amount{color:var(--brand)}
+.ticket{box-shadow:none}
+.ocard .ohead strong{font-weight:700;letter-spacing:-.02em}
+.ocard .oamt2,.oamt{color:var(--brand)}
+.foot{border-top:0}
+/* owner screens: quiet panels, figures that line up */
+.order,.tray,.fedit,.bk-item,.dcard,.kpi,.summary>span{box-shadow:none}
+.pagetitle{font-weight:800;letter-spacing:-.035em}
+.kpi.main{background:var(--house);color:var(--on-house)}
+.kpi.main small,.kpi.main p{color:var(--house-soft)}
+.kpi.main strong{color:var(--on-house)}
+.kpi strong,.oamt,.dval,.summary strong,.sumrow,.total,.bk-result strong,.hbars p,.legend li,.bk-num .in{font-variant-numeric:tabular-nums}
+.actions .yes,.bk-seg .on,.bk-opts button.on{background:var(--leaf);border-color:var(--leaf);color:var(--on-leaf)}
+.me .ai-b{background:var(--house);color:var(--on-house)}
+.tabbar{background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:none}
+.tabbar button[aria-selected="true"]{color:var(--leaf)}
+.tabbar button[aria-selected="true"]::before{background:var(--leaf)}
+.toast{background:var(--house);color:var(--on-house)}
+.ai-chips .ghost{border-color:var(--line);color:var(--ink);background:var(--surface)}
+@media (hover:hover){.ai-chips .ghost:hover{border-color:var(--leaf);background:var(--surface)}}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
   .done .tickc path{stroke-dashoffset:0}
@@ -1175,7 +1298,9 @@ function topBar(left){
       <button class="ibtn" data-act="go" data-id="mine" aria-label="${esc(t("myOrders"))}" title="${esc(t("myOrders"))}">${ico("list")}</button></div></header>`;
 }
 function heroHtml(){
-  return `<section class="hero"><h1>${esc(t("title"))}</h1><p>${esc(t("sub", cutoffLabel()))}</p><p class="clock" id="clock">${esc(clockText())}</p></section>
+  const art = S.fruits.filter(f => f.active && artFor(f)).slice(0, 3)
+    .map((f, i) => `<svg class="ha ha${i + 1}" viewBox="0 0 48 48">${artFor(f)}</svg>`).join("");
+  return `<section class="hero"><div class="hero-txt"><h1>${esc(t("title"))}</h1><p>${esc(t("sub", cutoffLabel()))}</p><p class="clock" id="clock">${esc(clockText())}</p></div>${art ? `<div class="hero-art" aria-hidden="true">${art}</div>` : ""}</section>
   <ol class="how" aria-label="${esc(t("howT"))}">
     <li><span class="hi">${ico("moon", 20)}</span><span><b>${esc(t("how1"))}</b><small>${esc(t("how1s", cutoffLabel()))}</small></span></li>
     <li><span class="hi">${ico("card", 20)}</span><span><b>${esc(t("how2"))}</b><small>${esc(t("how2s"))}</small></span></li>
