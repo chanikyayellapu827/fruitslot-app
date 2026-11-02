@@ -11,7 +11,8 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&family=Noto+Sans+Telugu:wght@400..700&display=swap" rel="stylesheet">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&family=Noto+Sans+Telugu:wght@400..700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&family=Noto+Sans+Telugu:wght@400..700&display=swap" rel="stylesheet"></noscript>
 <style>
 :root{
   /* colour */
@@ -1123,8 +1124,9 @@ async function photoFromFile(file){
     const s = Math.min(img.naturalWidth, img.naturalHeight);
     const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, size, size);
     g.drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, size, size);
-    let q = 0.82, out = c.toDataURL("image/jpeg", q);
-    while (out.length > 40000 && q > 0.35){ q -= 0.1; out = c.toDataURL("image/jpeg", q); }
+    const enc = q => { const w = c.toDataURL("image/webp", q); return w.startsWith("data:image/webp") ? w : c.toDataURL("image/jpeg", q); };   // WebP is smaller; Safari can't write it, so it falls back to JPEG
+    let q = 0.82, out = enc(q);
+    while (out.length > 40000 && q > 0.35){ q -= 0.1; out = enc(q); }
     if (out.length > 45000) throw new Error("This picture is too detailed. Try a simpler close-up photo.");
     return out;
   } finally { URL.revokeObjectURL(url); }
@@ -1356,7 +1358,11 @@ function shopRefresh(){
   const c = document.getElementById("chips"); if (c) c.innerHTML = chipsHtml();
   const x = document.querySelector(".searchbox .clr"); if (x) x.hidden = !S.q;
 }
-const IMG_MISSING = new Set();   // fruit ids whose img/<id>.webp file isn't there, so we don't ask again
+/* Fruit ids whose img/<id>.webp file isn't there. Remembered on this phone for a week, so each visit doesn't repeat the same failed requests. */
+let IMG_MISSING_T = Date.now();
+const IMG_MISSING = new Set();
+(() => { const v = LS.get("fs_img_missing", null); if (v && Array.isArray(v.ids) && Date.now() - v.t < 6048e5){ IMG_MISSING_T = v.t; v.ids.forEach(id => IMG_MISSING.add(id)); } })();
+const saveImgMissing = () => LS.set("fs_img_missing", { t: IMG_MISSING_T, ids: [...IMG_MISSING] });
 function heroArt(f){
   const a = artFor(f);
   const base = a ? `<svg class="art" viewBox="0 0 48 48" aria-hidden="true">${a}</svg>`
@@ -1371,7 +1377,7 @@ document.addEventListener("load", e => { const i = e.target; if (i.tagName === "
 document.addEventListener("error", e => {
   const i = e.target; if (i.tagName !== "IMG" || !i.classList.contains("ph")) return;
   if (i.dataset.next){ const n = i.dataset.next; delete i.dataset.next; i.src = n; return; }
-  const m = /img\/([^/]+)\.webp$/.exec(i.getAttribute("src") || ""); if (m) IMG_MISSING.add(decodeURIComponent(m[1]));
+  const m = /img\/([^/]+)\.webp$/.exec(i.getAttribute("src") || ""); if (m){ IMG_MISSING.add(decodeURIComponent(m[1])); saveImgMissing(); }
   i.remove();
 }, true);
 /* Short "About" lines, shown when the customer taps a fruit. No entry = nothing shown. */
@@ -2983,9 +2989,12 @@ document.addEventListener("input", e => {
     }
   }
 });
+let shopQTimer;   // wait for a short pause in typing before redrawing the grid
 document.addEventListener("input", e => {
   if (e.target.id !== "shop-q") return;
-  S.q = e.target.value; shopRefresh();
+  S.q = e.target.value;
+  const x = document.querySelector(".searchbox .clr"); if (x) x.hidden = !S.q;
+  clearTimeout(shopQTimer); shopQTimer = setTimeout(shopRefresh, 150);
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && S.sheet) ACTIONS.closeCart(); });
 document.addEventListener("input", e => {
@@ -3053,7 +3062,13 @@ async function refreshFruits(){
   else { S.loading = true; render(); await loadFruits(); render(); }
   document.addEventListener("visibilitychange", () => { if (!document.hidden && REMOTE() && S.view === "shop" && Date.now() - (S.fruitsAt || 0) > 120000) refreshFruits(); });
   setInterval(() => { const c = document.getElementById("clock"); if (c) c.textContent = clockText(); }, 30000);
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  if ("serviceWorker" in navigator && location.protocol === "https:"){
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+    // A newer version was saved in the background: reload once, but only when nothing would be lost (shop screen, empty cart, no sheet open).
+    navigator.serviceWorker.addEventListener("message", e => {
+      if (e.data && e.data.type === "fs-updated" && S.view === "shop" && !S.sheet && !Object.keys(S.cart).length && !document.activeElement.matches("input, textarea")) location.reload();
+    });
+  }
 })();
 </script>
 </body>
