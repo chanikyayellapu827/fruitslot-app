@@ -1,6 +1,6 @@
 // Opens the app at once from the saved copy, then checks for a newer one in the background.
 // Never touches Google (orders, prices, photos): those requests are not same-origin and are skipped.
-const CACHE = "fruitslot-v6";
+const CACHE = "fruitslot-v8";
 const SHELL = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener("activate", e => {

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>FruitSlot Eluru – order today, pick up fresh tomorrow</title>
+<title>FruitClub Eluru – fresh fruit delivered in minutes</title>
 <meta name="theme-color" content="#F2F0EB" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0E1714" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.json">
@@ -831,6 +831,40 @@ button,a,.in,summary,label{touch-action:manipulation}
   .done .tickc path{stroke-dashoffset:0}
   .done .ring{display:none}
 }
+
+/* ===== Instant delivery ===== */
+body[data-view^="i_"] #app{max-width:640px}
+.i-top{display:flex;align-items:center;justify-content:space-between;gap:var(--s2);padding:var(--s3) 0}
+.i-where{min-width:0;flex:1}.i-where b{display:block;font-size:var(--fs-xl);letter-spacing:-.01em;line-height:1.1}
+.i-addrbtn{display:flex;align-items:center;gap:4px;max-width:100%;background:none;border:0;padding:4px 0;color:var(--muted);font-size:var(--fs-s);font-weight:600;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.i-info{margin:0 0 var(--s3);color:var(--muted);font-size:var(--fs-s)}
+.i-price{margin:0}.i-price small{color:var(--muted)}
+.i-card.oos{opacity:.6}
+.i-login{text-align:center;padding:10vh 0 var(--s5);display:flex;flex-direction:column;gap:var(--s4);align-items:center}
+.i-lg .logo{width:76px;height:76px}.i-login h1{font-size:var(--fs-2xl);line-height:1.15;margin:0}.i-login .wide{max-width:360px}
+.i-h{font-size:var(--fs-m);margin:0 0 var(--s2)}
+.i-eta{display:flex;justify-content:space-between;align-items:center;gap:var(--s3)}
+.i-cl{list-style:none;margin:0;padding:0;display:grid;gap:var(--s3)}.i-cl li{display:flex;align-items:center;gap:var(--s3)}.i-cl .cn2{flex:1;min-width:0;display:grid}
+.i-cl .ci2{width:48px;height:48px;flex:0 0 auto;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--tint) 14%,var(--surface))}
+.i-cl .stepper{width:132px;flex:0 0 auto}
+.i-stick{position:sticky;bottom:calc(var(--s3) + env(safe-area-inset-bottom,0px));padding-top:var(--s3);z-index:3}
+.i-pay{display:flex;gap:var(--s3);align-items:flex-start;padding:var(--s2) 0}
+.i-status h1{font-size:var(--fs-xl);margin:0 0 var(--s2)}
+.i-rider{display:flex;justify-content:space-between;align-items:center;gap:var(--s3)}
+.i-ord{display:block;width:100%;text-align:left;background:none;border:0;padding:0;color:inherit}
+.i-ownbar{display:flex;gap:var(--s2);flex-wrap:wrap;align-items:center;margin-bottom:var(--s3)}
+.i-ownbar .in{width:auto;margin:0}.i-ownbar .ghost{min-height:40px}
+.i-rider-in{display:flex;gap:var(--s2);width:100%}.i-rider-in .in{margin:0}
+.i-pin{display:flex;align-items:center;gap:4px;font-weight:700}.i-pin .in{width:104px;margin:0}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.warn{background:var(--warn-bg);color:var(--warn)}
+.i-trk{list-style:none;margin:var(--s3) 0 0;padding:0;display:grid}
+.i-trk li{display:flex;align-items:center;gap:var(--s3);padding:7px 0;color:var(--muted)}
+.i-trk .dot{width:22px;height:22px;flex:0 0 22px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;background:var(--surface)}
+.i-trk li.done{color:var(--ink)}.i-trk li.done .dot{background:var(--ok);border-color:var(--ok);color:#fff}
+.i-trk li.cur{color:var(--ink);font-weight:700}.i-trk li.cur .dot{border-color:var(--leaf);box-shadow:0 0 0 4px color-mix(in srgb,var(--leaf) 20%,transparent)}
+.i-rider-in{grid-column:1/-1}
+#i-qr{width:min(240px,70vw);margin:var(--s3) auto}
+b.ok,.ok{color:var(--ok)}b.bad,.bad{color:var(--bad)}
 </style>
 </head>
 <body>
@@ -849,13 +883,20 @@ const CONFIG = {
   API_URL: "https://script.google.com/macros/s/AKfycbxBxQ9CNVKYOlU_fNnQaBL_N2yz9zhZ5rg92KEKqT5k-IN7DS_ZQTSOB_2LMLLJ7wji/exec",              // paste your Google Apps Script web app URL here. Empty = demo mode (orders stay on this phone only)
   UPI_ID: "Q800513737@ybl",    // the UPI ID customers pay to – check this is correct
   UPI_LINK: false,             // false = customers pay by QR code or by typing the UPI ID (UPI apps often decline link payments to a personal UPI ID "for security reasons"). true = also show Pay with UPI, Google Pay, PhonePe and Paytm link buttons
-  PAYEE: "FruitSlot",
+  PAYEE: "FruitClub",
   CUTOFF_HOUR: 21,             // orders close at 9 PM for next-day pickup
   SHOPS: [
     { id: "1town", name: "1 Town Rythu Bazar", supplied: true },   // supplied: true = "Supplied shop": fruit is billed to the owner's brother at cost, so it has no profit and is left out of the combined profit and sales
     { id: "2town", name: "2 Town Rythu Bazar" }
   ],
-  DEMO_OWNER_KEY: "1234"       // only used in demo mode
+  DEMO_OWNER_KEY: "1234",      // only used in demo mode
+  /* Instant delivery. INSTANT: true = the Blinkit-style app (login, address, buy now, live tracking). false = the old order-today-pick-up-tomorrow app.
+     Leave the two SUPABASE lines empty = demo: everything is saved on this phone only. Paste your project URL and the public "anon" key (Supabase > Settings > API) to go live.
+     The anon key is public by design, the database security rules decide what it can do. NEVER paste the service_role key, Cashfree or WhatsApp secrets here. */
+  INSTANT: true,
+  SUPABASE_URL: "",            // like https://abcdxyz.supabase.co
+  SUPABASE_ANON_KEY: "",       // the public anon key only
+  ETA: "30 min"                // shown as "Delivery in 30 min"
 };
 
 /* Starting fruit list. Only the pomegranate numbers are real – set every other price on the owner screen. */
@@ -1335,7 +1376,7 @@ function chipsHtml(){
   return ["fruits", "exotic", "melons", "all"].map(c => `<button class="chip-btn" data-act="cat" data-id="${c}" aria-pressed="${S.cat === c}">${esc(t("cat_" + c))}</button>`).join("");
 }
 function viewShop(){
-  const head = topBar(`<div class="brand">${LOGO}<span><span class="mark">FruitSlot</span> <span class="town">Eluru</span></span></div>`);
+  const head = topBar(`<div class="brand">${LOGO}<span><span class="mark">FruitClub</span> <span class="town">Eluru</span></span></div>`);
   if (!S.fruits.length && S.loading) return head + `<div class="skel hero-s"></div>` + skeletonHtml();
   if (S.loadError && !S.fruits.length) return head + `<ul class="grid">${estate("refresh", t("loadFail"), "", `<button class="primary" data-act="reload">${esc(t("tryAgain"))}</button>`)}</ul>`;
   return head + heroHtml() + `
@@ -1581,18 +1622,18 @@ function ownerDayOrders(includeRejected){
 }
 function viewOwner(){
   const tab = S.ownerTab;
-  const tabs = [["ai","Assistant","sparkle"],["orders","Orders","receipt"],["trays","Trays","tray"],["book","Book","book"],["profit","Dashboard","chart"],["fruits","Prices","tag"]];
+  const tabs = [["ai","Assistant","sparkle"],["orders","Orders","receipt"],["trays","Trays","tray"],["book","Book","book"],["profit","Dashboard","chart"],["fruits","Prices","tag"]].filter(x => !(INST() && x[0] === "trays"));   // instant orders have no "order today, pick up tomorrow" trays
   const titles = { ai:"Assistant", orders:"Orders", trays:"Trays to buy", book:"Daily book", profit:"Dashboard", fruits:"Prices" };
-  const pend = ownerDayOrders(false).filter(o => o.status === "pending").length;
+  const pend = INST() ? I.own.orders.filter(o => o.status === "placed").length : ownerDayOrders(false).filter(o => o.status === "pending").length;
   return `
-  <header class="ohdr"><div class="brand">${LOGO}<span><span class="mark">FruitSlot</span><span class="town">Owner</span></span></div>
+  <header class="ohdr"><div class="brand">${LOGO}<span><span class="mark">FruitClub</span><span class="town">Owner</span></span></div>
     <div class="topbtns"><button class="ibtn" data-act="go" data-id="shop" aria-label="Customer view" title="Customer view">${ico("store")}</button><button class="ibtn" data-act="refresh" aria-label="Refresh" title="Refresh">${ico("refresh")}</button><button class="ibtn" data-act="ownerLogout" aria-label="Log out" title="Log out">${ico("logout")}</button></div></header>
   ${tab === "ai" ? "" : `<h1 class="pagetitle">${titles[tab] || ""}</h1>`}
-  ${tab === "orders" || tab === "trays" ? `<div class="filters">
+  ${(tab === "orders" && !INST()) || tab === "trays" ? `<div class="filters">
     <label>Pickup day<input class="in" type="date" id="o-date" value="${S.ownerDate}"></label>
     ${tab === "orders" ? `<label>Shop<select class="in" id="o-shop"><option value="all">Both shops</option>${CONFIG.SHOPS.map(s => `<option value="${s.id}" ${S.ownerShop === s.id ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>` : ""}
   </div>` : ""}
-  ${tab === "orders" ? ownerOrdersHtml() : tab === "trays" ? ownerTraysHtml() : tab === "book" ? ownerBookHtml() : tab === "ai" ? ownerAiHtml() : tab === "profit" ? ownerDashHtml() : ownerFruitsHtml()}
+  ${tab === "orders" ? (INST() ? ownerLiveHtml() : ownerOrdersHtml()) : tab === "trays" ? ownerTraysHtml() : tab === "book" ? ownerBookHtml() : tab === "ai" ? ownerAiHtml() : tab === "profit" ? ownerDashHtml() : ownerFruitsHtml()}
   <nav class="tabbar" role="tablist" aria-label="Owner sections">${tabs.map(([k, l, ic]) => `<button role="tab" aria-selected="${tab === k}" aria-label="${l}" data-act="ownerTab" data-id="${k}">${ico(ic, 22)}<span>${l}</span>${k === "orders" && pend ? `<b class="tbadge" aria-label="${pend} to check">${pend}</b>` : ""}</button>`).join("")}</nav>`;
 }
 function ownerOrdersHtml(){
@@ -1999,7 +2040,7 @@ const aiDayName = (ds, weekdayOnly) => { const [y, m, d] = ds.split("-").map(Num
   return t.toLocaleDateString("en-IN", weekdayOnly ? { weekday:"long" } : { weekday:"long", day:"numeric", month:"short", year:"numeric" }); };
 function aiSystem(){
   const n = ist();
-  return `You are the FruitSlot assistant for the owner of two fruit shops in Eluru: ${CONFIG.SHOPS.map(s => `"${s.id}" = ${s.name}`).join(", ")}.
+  return `You are the FruitClub assistant for the owner of two fruit shops in Eluru: ${CONFIG.SHOPS.map(s => `"${s.id}" = ${s.name}`).join(", ")}.
 Today is ${ymd(n)} (${aiDayName(ymd(n))}), time ${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")} IST.
 Last 7 days (use this table for weekdays, never work them out yourself):
 ${dayList(ymd(n), 7).reverse().map((ds, i) => `${ds} = ${aiDayName(ds, true)}${i === 0 ? " (today)" : i === 1 ? " (yesterday)" : ""}`).join("\n")}
@@ -2556,6 +2597,7 @@ function render(){
   if (S.view !== S.lastView){ window.scrollTo(0, 0); S.lastView = S.view; }
   if (S.view === "done") drawQR();
   syncBar();
+  if (INST()) instAfterRender();
 }
 /* On a phone, the QR for the order is saved by itself as a picture (the browser puts it in Downloads, which the gallery shows). A site can't write to the gallery directly. */
 async function autoSaveQR(o){
@@ -2942,6 +2984,564 @@ async function leavePrices(run){
   } else { S.editFruits = null; S.editGone = null; S.fruitsDirty = false; }
   run();
 }
+/* ===== Instant delivery: Blinkit-style app. Data comes from Supabase when CONFIG has the URL and key, otherwise from this phone (demo). ===== */
+const INST = () => !!CONFIG.INSTANT;
+const SB_ON = () => !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
+const kmBetween = (a, b, c, d) => { const p = Math.PI / 180, x = Math.sin((c - a) * p / 2) ** 2 + Math.cos(a * p) * Math.cos(c * p) * Math.sin((d - b) * p / 2) ** 2; return 2 * 6371 * Math.asin(Math.sqrt(x)); };
+const hmMin = s => { const [h, m] = String(s || "0:0").split(":").map(Number); return h * 60 + (m || 0); };
+const nowMin = () => { const n = ist(); return n.getHours() * 60 + n.getMinutes(); };
+const isOpenNow = sh => !!sh && sh.is_open !== false && (!SB_ON() || (nowMin() >= hmMin(sh.open_time) && nowMin() < hmMin(sh.close_time)));
+const nq = q => String(r2(q));
+const iq = (u, q) => nq(q) + (u === "pc" ? " pc" : " kg");
+const I_COLORS = { pomegranate:"#B3123A", apple:"#C8202F", kamala:"#F08A1C", mosambi:"#9BB83A", "black-grapes":"#3B1F4A", kiwi:"#7A5A2B", "white-dragon":"#D9568C", "red-dragon":"#B3123A", plum:"#6B2D5C", pineapple:"#E8B923", muskmelon:"#E8B923", watermelon:"#2F7D46", regipandu:"#C9A227", avacado:"#4C6B2A" };
+const addrText = a => [a && a.house, a && a.area, a && a.landmark].filter(Boolean).join(", ");
+const I_STEPS = ["placed", "accepted", "packed", "out_for_delivery", "delivered"];
+const I_LABEL = { placed:"Order placed", accepted:"Shop accepted", packed:"Packed", out_for_delivery:"On the way", delivered:"Delivered", cancelled:"Cancelled" };
+const I_HEAD = { placed:"Waiting for the shop to accept", accepted:"Getting your fruit ready", packed:"Packed. A rider is picking it up", out_for_delivery:"Your order is on the way", delivered:"Delivered. Enjoy!", cancelled:"Order cancelled" };
+
+/* --- Supabase, with plain fetch (no library). The anon key is public; the database rules decide what it can do. --- */
+const SB = {
+  sess: LS.get("fs_sb", null),
+  save(s){ SB.sess = s; LS.set("fs_sb", s); },
+  grab(){   // after the Google sign-in the browser comes back with the tokens in the address
+    const h = new URLSearchParams(location.hash.replace(/^#/, ""));
+    if (h.get("access_token")){
+      SB.save({ access_token:h.get("access_token"), refresh_token:h.get("refresh_token"), exp:Date.now() / 1000 + Number(h.get("expires_in") || 3600) });
+      history.replaceState(null, "", location.pathname + location.search);
+    } else if (h.get("error_description")){ I.loginErr = niceError(h.get("error_description"), "Sign-in didn't work. Try again."); history.replaceState(null, "", location.pathname + location.search); }
+  },
+  uid(){ try { return JSON.parse(atob(SB.sess.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).sub; } catch(e){ return null; } },
+  async fresh(){
+    const s = SB.sess; if (!s || s.exp - Date.now() / 1000 > 60) return;
+    try {
+      const r = await fetch(CONFIG.SUPABASE_URL + "/auth/v1/token?grant_type=refresh_token", { method:"POST", headers:{ apikey:CONFIG.SUPABASE_ANON_KEY, "Content-Type":"application/json" }, body:JSON.stringify({ refresh_token:s.refresh_token }) });
+      const j = await r.json(); if (!r.ok || !j.access_token) throw new Error("expired");
+      SB.save({ access_token:j.access_token, refresh_token:j.refresh_token, exp:Date.now() / 1000 + (j.expires_in || 3600) });
+    } catch(e){ if (!(e instanceof TypeError)) SB.save(null); }   // offline: keep the session and try again later
+  },
+  async call(path, o){
+    o = o || {}; await SB.fresh();
+    const key = CONFIG.SUPABASE_ANON_KEY;
+    let r, text;
+    try {
+      r = await fetch(CONFIG.SUPABASE_URL + path, { method:o.method || "GET", headers:{ apikey:key, Authorization:"Bearer " + ((SB.sess && SB.sess.access_token) || key), "Content-Type":"application/json", Prefer:"return=representation" }, body:o.body ? JSON.stringify(o.body) : undefined });
+      text = await r.text();
+    } catch(e){ throw new Error("Couldn't reach the shop. Check your internet and try again."); }
+    let j = null; try { j = text ? JSON.parse(text) : null; } catch(e){}
+    if (!r.ok){
+      if (r.status === 401 && SB.sess){ SB.save(null); throw new Error("Please log in again."); }
+      throw new Error(niceError(j && (j.message || j.error_description || j.msg), "Something went wrong. Try again."));
+    }
+    return j;
+  },
+  google(){ location.href = CONFIG.SUPABASE_URL + "/auth/v1/authorize?provider=google&redirect_to=" + encodeURIComponent(location.origin + location.pathname); }
+};
+
+/* --- Demo data (this phone only) --- */
+const DEMO_SHOPS = ["1town", "2town"].map((id, i) => ({ id, name:i ? "2 Town Rythu Bazar" : "1 Town Rythu Bazar", lat:16.7107, lng:81.0952, radius_km:4, is_open:true, open_time:"07:00", close_time:"21:00" }));
+const DEMO_PRODUCTS = [["pomegranate", "Pomegranate", "దానిమ్మ", "kg", .5, 180], ["apple", "Apple", "యాపిల్", "kg", .5, 180], ["kamala", "Orange (Kamala)", "కమలా పండు", "kg", .5, 75], ["mosambi", "Mosambi", "బత్తాయి", "kg", .5, 50],
+  ["black-grapes", "Black grapes", "ద్రాక్ష", "kg", .5, 100], ["kiwi", "Kiwi", "", "kg", .25, 360], ["white-dragon", "Dragon fruit (white)", "", "kg", .5, 120], ["plum", "Plum", "", "kg", .25, 200], ["pineapple", "Pineapple", "అనాస", "kg", 1, 60], ["avacado", "Avocado", "", "pc", 1, 70]];
+const demoDb = () => LS.get("fs_i_db", { open:{}, stock:{}, price:{}, seq:1000 });
+const demoCatalog = () => {
+  const d = demoDb(), prods = {};
+  DEMO_SHOPS.forEach(s => { prods[s.id] = DEMO_PRODUCTS.map(([id, name, te, unit, step, price], i) => ({ id, name, te, unit, step, sort:i, price:d.price[s.id + "|" + id] ?? price, in_stock:d.stock[s.id + "|" + id] !== false, color:I_COLORS[id] || "#2F7D46" })); });
+  return { shops:DEMO_SHOPS.map(s => ({ ...s, is_open:d.open[s.id] !== false })), prods, set:{ min_order:300, delivery_fee:30, free_delivery_above:600, upi_id:CONFIG.UPI_ID } };
+};
+const demoOrders = () => LS.get("fs_i_orders", []);
+const keepOrders = list => LS.set("fs_i_orders", list.slice(-200));
+
+/* One set of calls for the app. Each one talks to Supabase, or to this phone in demo mode. */
+const IB = {
+  async catalog(){
+    if (!SB_ON()) return demoCatalog();
+    const [shops, rows, set] = await Promise.all([SB.call("/rest/v1/shops?select=*&order=id"), SB.call("/rest/v1/shop_products?select=shop_id,product_id,price,in_stock,products!inner(id,name,name_te,unit,step,sort)"), SB.call("/rest/v1/settings?select=key,value")]);
+    const prods = {};
+    rows.forEach(r => (prods[r.shop_id] = prods[r.shop_id] || []).push({ id:r.product_id, name:r.products.name, te:r.products.name_te || "", unit:r.products.unit, step:Number(r.products.step), sort:r.products.sort, price:Number(r.price), in_stock:r.in_stock, color:I_COLORS[r.product_id] || "#2F7D46" }));
+    Object.values(prods).forEach(l => l.sort((a, b) => a.sort - b.sort));
+    const s = {}; set.forEach(x => { s[x.key] = x.value; });
+    return { shops, prods, set:s };
+  },
+  async me(){
+    if (!SB_ON()) return LS.get("fs_i_user", null);
+    const u = await SB.call("/auth/v1/user"); const m = u.user_metadata || {};
+    return { id:u.id, name:m.full_name || m.name || "", email:u.email || "" };
+  },
+  async addresses(){
+    if (!SB_ON()) return LS.get("fs_i_addrs", []);
+    return SB.call("/rest/v1/addresses?select=*&order=created_at.desc");
+  },
+  async saveAddress(a){
+    if (!SB_ON()){ const l = LS.get("fs_i_addrs", []); const n = { ...a, id:"a" + Date.now() }; l.unshift(n); LS.set("fs_i_addrs", l); return n; }
+    return (await SB.call("/rest/v1/addresses", { method:"POST", body:{ ...a, user_id:SB.uid() } }))[0];
+  },
+  async deleteAddress(id){
+    if (!SB_ON()){ LS.set("fs_i_addrs", LS.get("fs_i_addrs", []).filter(x => x.id !== id)); return; }
+    await SB.call("/rest/v1/addresses?id=eq." + encodeURIComponent(id), { method:"DELETE" });
+  },
+  async place(p){
+    if (SB_ON()) return SB.call("/rest/v1/rpc/place_order", { method:"POST", body:{ p_shop_id:p.shop.id, p_address_id:p.addr.id, p_items:p.items.map(i => ({ product_id:i.id, qty:i.qty })), p_payment_method:p.method, p_mode:"instant", p_notes:null } });
+    const cat = demoCatalog(), sh = cat.shops.find(s => s.id === p.shop.id), a = p.addr;   // the same checks the database makes
+    if (!sh.is_open) throw new Error("Shop is closed right now");
+    if (kmBetween(sh.lat, sh.lng, a.lat, a.lng) > sh.radius_km) throw new Error("Sorry, this address is outside our delivery area");
+    let sub = 0; const items = p.items.map(i => {
+      const pr = (cat.prods[sh.id] || []).find(x => x.id === i.id); if (!pr) throw new Error("Item " + i.id + " is not sold here"); if (!pr.in_stock) throw new Error(pr.name + " is out of stock");
+      if (!(i.qty > 0 && i.qty <= 50) || Math.abs(i.qty / pr.step - Math.round(i.qty / pr.step)) > 1e-9) throw new Error("Bad quantity for " + pr.name);
+      const line = r2(pr.price * i.qty); sub += line; return { product_id:pr.id, name:pr.name, unit:pr.unit, qty:i.qty, price:pr.price, line_total:line };
+    });
+    if (sub < cat.set.min_order) throw new Error("Minimum order is Rs " + cat.set.min_order);
+    const fee = sub >= cat.set.free_delivery_above ? 0 : cat.set.delivery_fee, d = demoDb(); d.seq += 1; LS.set("fs_i_db", d);
+    const o = { id:d.seq, shop_id:sh.id, status:"placed", payment_method:p.method, payment_status:"pending", subtotal:r2(sub), delivery_fee:fee, total:r2(sub + fee), address:{ label:a.label, name:a.name, phone:a.phone, house:a.house, area:a.area, landmark:a.landmark, lat:a.lat, lng:a.lng },
+      notes:null, rider_name:null, rider_phone:null, created_at:new Date().toISOString(), order_items:items };
+    keepOrders(demoOrders().concat([o])); return o;
+  },
+  async orders(){
+    if (!SB_ON()) return demoOrders().slice().reverse().slice(0, 20);
+    return SB.call("/rest/v1/orders?select=*,order_items(*)&user_id=eq." + SB.uid() + "&order=created_at.desc&limit=20");
+  },
+  async demoPatch(id, fn){ const l = demoOrders(), o = l.find(x => x.id === id); if (!o) throw new Error("Order not found."); fn(o); keepOrders(l); return o; },
+  async paidUpi(id){ if (SB_ON()) return SB.call("/rest/v1/rpc/customer_paid_upi", { method:"POST", body:{ p_order_id:id } }); return IB.demoPatch(id, o => { o.payment_status = "to_verify"; }); },
+  async cancel(id){ if (SB_ON()) return SB.call("/rest/v1/rpc/cancel_order", { method:"POST", body:{ p_order_id:id } }); return IB.demoPatch(id, o => { if (o.status !== "placed") throw new Error("This order can no longer be cancelled"); o.status = "cancelled"; }); },
+  /* shop side */
+  async ownerLoad(){
+    if (!SB_ON()) return { staff:DEMO_SHOPS.map(s => ({ shop_id:s.id })), orders:demoOrders().slice(-80) };
+    const staff = await SB.call("/rest/v1/staff?select=shop_id,role"); if (!staff.length) return { staff, orders:[] };
+    const since = new Date(ymd(ist()) + "T00:00:00+05:30").toISOString();
+    const orders = await SB.call("/rest/v1/orders?select=*,order_items(*)&or=(status.in.(placed,accepted,packed,out_for_delivery),created_at.gte." + since + ")&order=created_at.asc");
+    return { staff, orders };
+  },
+  async setStatus(id, patch){ if (SB_ON()) return SB.call("/rest/v1/orders?id=eq." + id, { method:"PATCH", body:patch }); return IB.demoPatch(id, o => Object.assign(o, patch)); },
+  async codPaid(id){ if (SB_ON()) return SB.call("/rest/v1/rpc/mark_cod_paid", { method:"POST", body:{ p_order_id:id } }); return IB.demoPatch(id, o => { o.payment_status = "paid"; }); },
+  async confirmUpi(id, ok){ if (SB_ON()) return SB.call("/rest/v1/rpc/confirm_upi", { method:"POST", body:{ p_order_id:id, p_received:ok } }); return IB.demoPatch(id, o => { o.payment_status = ok ? "paid" : "failed"; }); },
+  async setOpen(shop, open){ if (SB_ON()) return SB.call("/rest/v1/shops?id=eq." + shop, { method:"PATCH", body:{ is_open:open } }); const d = demoDb(); d.open[shop] = open; LS.set("fs_i_db", d); },
+  async saveProd(shop, pid, patch){
+    if (SB_ON()) return SB.call("/rest/v1/shop_products?shop_id=eq." + shop + "&product_id=eq." + encodeURIComponent(pid), { method:"PATCH", body:patch });
+    const d = demoDb(); if (patch.price != null) d.price[shop + "|" + pid] = patch.price; if (patch.in_stock != null) d.stock[shop + "|" + pid] = patch.in_stock; LS.set("fs_i_db", d);
+  }
+};
+
+/* --- State --- */
+const I = { ready:false, err:"", shops:[], prods:{}, set:{}, user:null, addrs:[], orders:[], cart:LS.get("fs_icart", {}), addrId:LS.get("fs_iaddr", ""), pay:LS.get("fs_ipay", "upi"),
+  q:"", cat:"all", track:null, draft:{ label:"Home" }, addrNew:false, back:"i_home", own:{ ready:false, orders:[], staff:null, seen:null, sub:"active", err:"" }, loginErr:"" };
+if (INST()) S.view = "i_home";
+const loggedIn = () => SB_ON() ? !!SB.sess : !!I.user;
+const saveCart = () => LS.set("fs_icart", I.cart);
+const sigOf = x => JSON.stringify(x);
+const typing = () => { const a = document.activeElement; return !!a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName); };
+function curShop(){
+  const a = I.addrs.find(x => x.id === I.addrId);
+  if (a){
+    let best = null;
+    I.shops.forEach(s => { if (s.lat == null) return; const d = kmBetween(s.lat, s.lng, a.lat, a.lng); if (!best || d < best.d) best = { s, d }; });
+    if (best) return { shop:best.s, km:best.d, out:best.d > Number(best.s.radius_km), addr:a };
+  }
+  return { shop:I.shops[0], km:null, out:false, addr:null };
+}
+const shopProds = () => { const c = curShop(); return c.shop ? (I.prods[c.shop.id] || []) : []; };
+function iLines(){
+  const list = shopProds(), L = [];
+  Object.keys(I.cart).forEach(id => { const p = list.find(x => x.id === id); if (p && I.cart[id] > 0) L.push({ p, qty:I.cart[id], line:r2(p.price * I.cart[id]) }); });
+  return L;
+}
+function iBill(){
+  const L = iLines(), sub = r2(L.reduce((s, l) => s + l.line, 0)), min = Number(I.set.min_order || 0), fee = Number(I.set.delivery_fee || 0), free = I.set.free_delivery_above != null ? Number(I.set.free_delivery_above) : 1e9;
+  const delivery = !L.length ? 0 : sub >= free ? 0 : fee;
+  return { L, sub, min, fee, free, delivery, total:r2(sub + delivery) };
+}
+const upiId = () => (typeof I.set.upi_id === "string" && I.set.upi_id) || CONFIG.UPI_ID;
+
+/* --- Loading --- */
+async function instCatalog(){
+  try { const c = await IB.catalog(); I.shops = c.shops; I.prods = c.prods; I.set = c.set; I.err = ""; }
+  catch(e){ I.err = niceError(e.message, "Couldn't load the fruit list. Try again."); }
+}
+async function instAccount(){
+  if (!loggedIn()) return;
+  try { I.user = await IB.me(); I.addrs = await IB.addresses(); I.orders = await IB.orders(); }
+  catch(e){ if (SB_ON() && !SB.sess) I.user = null; }
+  if (!I.addrs.some(a => a.id === I.addrId)){ const d = I.addrs.find(a => a.is_default) || I.addrs[0]; I.addrId = d ? d.id : ""; LS.set("fs_iaddr", I.addrId); }
+}
+async function instInit(){
+  if (SB_ON()) SB.grab(); else I.user = LS.get("fs_i_user", null);
+  await Promise.all([instCatalog(), instAccount()]);
+  I.ready = true;
+  const after = LS.get("fs_i_after", null); LS.set("fs_i_after", null);
+  if (after === "owner" && S.ownerKey) { await ACTIONS.ownerLogin(S.ownerKey); startTick(); return; }
+  S.view = after === "owner" ? "ownerLogin" : after === "cart" && loggedIn() ? "i_cart" : (!loggedIn() && !LS.get("fs_i_seen", false) ? "i_login" : "i_home");
+  render(); startTick();
+}
+
+/* --- Customer screens --- */
+const caret = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>`;
+const iBack = (to, title) => `<header class="top"><button class="link" data-act="iGo" data-id="${to}">Back</button><span class="title">${esc(title)}</span><span style="width:48px"></span></header>`;
+function viewILogin(){
+  return `<section class="i-login"><div class="i-lg">${LOGO}</div>
+    <h1>Fresh fruit at your door in ${esc(CONFIG.ETA)}</h1>
+    <p class="note">From Rythu Bazar, Eluru. Pay by UPI or cash on delivery.</p>
+    ${I.loginErr ? `<p class="err" role="alert">${esc(I.loginErr)}</p>` : ""}
+    <button class="primary wide big" data-act="iSignIn" data-id="home">${SB_ON() ? "Continue with Google" : "Continue as demo customer"}</button>
+    <button class="link" data-act="iBrowse">Just browse</button>
+    ${SB_ON() ? "" : `<p class="note">${esc(t("demo"))}</p>`}</section>`;
+}
+function iHeader(){
+  const c = curShop(), a = c.addr;
+  return `<header class="i-top"><div class="i-where"><b>Delivery in ${esc(CONFIG.ETA)}</b>
+    <button class="i-addrbtn" data-act="iGo" data-id="i_addr">${a ? esc(a.label + " · " + addrText(a)) : "Add delivery address"} ${caret}</button></div>
+    <div class="topbtns"><button class="ibtn" data-act="iGo" data-id="i_orders" aria-label="My orders" title="My orders">${ico("list")}</button></div></header>`;
+}
+function iFiltered(){
+  const q = I.q.trim().toLowerCase();
+  return shopProds().filter(p => (I.cat === "all" || categoryOf(p) === I.cat) && (!q || (p.name + " " + p.te).toLowerCase().includes(q)));
+}
+function iQty(p){
+  const q = I.cart[p.id];
+  if (!p.in_stock) return `<button class="add" disabled>Out of stock</button>`;
+  if (!q) return `<button class="add" data-act="iAdd" data-id="${esc(p.id)}">ADD</button>`;
+  return `<div class="stepper"><button data-act="iDec" data-id="${esc(p.id)}" aria-label="Less ${esc(p.name)}">−</button><output aria-live="polite">${iq(p.unit, q)}</output><button data-act="iAdd" data-id="${esc(p.id)}" aria-label="More ${esc(p.name)}">+</button></div><span class="ltot">${rupee(q * p.price)}</span>`;
+}
+function iCard(p){
+  return `<li class="fcard i-card ${p.in_stock ? "" : "oos"}" id="ic-${esc(p.id)}"><div class="fimg" style="--tint:${esc(p.color)}">${heroArt(p)}</div>
+    <div class="fbody"><div><h3 class="fn">${esc(p.name)}</h3>${p.te ? `<p class="fsub" lang="te">${esc(p.te)}</p>` : ""}</div>
+    <p class="i-price"><b>${rupee(p.price)}</b> <small>/ ${p.unit === "pc" ? "piece" : "kg"}</small></p><div class="qtyzone">${iQty(p)}</div></div></li>`;
+}
+function iGridHtml(){
+  const all = shopProds(); if (!all.length) return estate("tag", "No fruit on sale right now", "Check back soon.");
+  const l = iFiltered();
+  return l.length ? l.map(iCard).join("") : estate("search", "No fruit matches", "Try another name.", `<button class="ghost" data-act="iClearQ">Clear search</button>`);
+}
+function iCartBar(){
+  const b = iBill(); if (!b.L.length) return "";
+  return `<div class="cartbar"><button data-act="iGo" data-id="i_cart"><span class="ci">${ico("cart", 26)}<span class="cn">${b.L.length}</span></span>
+    <span class="cm"><strong>${rupee(b.sub)}</strong><small>${b.L.length} ${b.L.length === 1 ? "item" : "items"}</small></span><span class="cgo">View cart</span></button></div>`;
+}
+function iNotice(){
+  const c = curShop();
+  if (!I.shops.length) return "";
+  if (c.out) return `<p class="banner">We don't deliver to this address yet. <button class="link" data-act="iGo" data-id="i_addr">Change address</button></p>`;
+  if (!isOpenNow(c.shop)) return `<p class="banner">${esc(c.shop.name)} is closed now. Opens at ${esc(String(c.shop.open_time).slice(0, 5))}.</p>`;
+  return "";
+}
+function viewIHome(){
+  if (!I.ready) return iHeader() + skeletonHtml();
+  if (I.err && !I.shops.length) return iHeader() + `<ul class="grid">${estate("refresh", I.err, "", `<button class="primary" data-act="iReload">${esc(t("tryAgain"))}</button>`)}</ul>`;
+  return iHeader() + `${iNotice()}<p class="i-info">Free delivery above ${rupee(I.set.free_delivery_above || 0)} · Minimum order ${rupee(I.set.min_order || 0)}</p>
+  <div class="toolbar"><div class="searchbox">${ico("search", 20)}<input class="in" id="i-q" type="search" inputmode="search" autocomplete="off" placeholder="Search fruit" aria-label="Search fruit" value="${esc(I.q)}"></div>
+    <div class="chips" id="i-chips" role="group">${iChips()}</div></div>
+  <ul class="grid" id="i-grid">${iGridHtml()}</ul>
+  <footer class="foot"><button class="link" data-act="go" data-id="ownerLogin">${esc(t("owner"))}</button>${SB_ON() ? "" : `<span class="note">${esc(t("demo"))}</span>`}</footer>
+  <div id="icartbar">${iCartBar()}</div>`;
+}
+const iChips = () => ["all", "fruits", "exotic", "melons"].map(c => `<button class="chip-btn" data-act="iCat" data-id="${c}" aria-pressed="${I.cat === c}">${esc(t("cat_" + c))}</button>`).join("");
+function iRepaintGrid(){
+  const g = document.getElementById("i-grid"); if (!g || S.view !== "i_home") return;
+  g.innerHTML = iGridHtml(); const c = document.getElementById("i-chips"); if (c) c.innerHTML = iChips();
+}
+function iRefreshRow(id){
+  const p = shopProds().find(x => x.id === id), z = document.querySelector(`#ic-${CSS.escape(id)} .qtyzone`);
+  if (p && z) z.innerHTML = iQty(p);
+  const bar = document.getElementById("icartbar"); if (bar) bar.innerHTML = iCartBar();
+}
+/* What the main button at the bottom of the cart does right now */
+function iPlaceState(){
+  const b = iBill(), c = curShop();
+  if (!b.L.length) return { label:"Your cart is empty", act:"" };
+  if (!loggedIn()) return { label:"Log in to continue", act:"iSignIn", arg:"cart" };
+  if (!c.addr) return { label:"Add delivery address", act:"iGoAddr" };
+  if (c.out) return { label:"We don't deliver to this address", act:"" };
+  if (!isOpenNow(c.shop)) return { label:"Shop is closed now", act:"" };
+  if (b.sub < b.min) return { label:`Add ${rupee(b.min - b.sub)} more to order`, act:"" };
+  return { label:`Place order · ${rupee(b.total)}`, act:"iPlace" };
+}
+function viewICart(){
+  const b = iBill(), c = curShop(), st = iPlaceState();
+  const head = iBack("i_home", "Your cart");
+  if (!b.L.length) return head + `<ul class="grid" style="grid-template-columns:1fr">${estate("cart", t("emptyCart"), t("emptyCartS"), `<button class="primary" data-act="iGo" data-id="i_home">${esc(t("chooseFruit"))}</button>`)}</ul>`;
+  const nudge = b.sub < b.min ? `Add ${rupee(b.min - b.sub)} more to place an order (minimum ${rupee(b.min)})` : b.delivery > 0 && b.free < 1e9 ? `Add ${rupee(b.free - b.sub)} more for free delivery` : "";
+  return head + `<section class="card i-eta"><b>Delivery in ${esc(CONFIG.ETA)}</b><span class="note">from ${esc(c.shop.name)}</span></section>
+  <section class="card"><ul class="cl i-cl">${b.L.map(l => `<li><span class="ci2" style="--tint:${esc(l.p.color)}">${fruitIcon(l.p)}</span>
+    <span class="cn2"><strong>${esc(l.p.name)}</strong><span class="note">${rupee(l.p.price)} / ${l.p.unit === "pc" ? "piece" : "kg"} · <b>${rupee(l.line)}</b></span></span>
+    <span class="stepper"><button data-act="iDecC" data-id="${esc(l.p.id)}" aria-label="Less ${esc(l.p.name)}">−</button><output>${iq(l.p.unit, l.qty)}</output><button data-act="iAddC" data-id="${esc(l.p.id)}" aria-label="More ${esc(l.p.name)}">+</button></span></li>`).join("")}</ul></section>
+  ${nudge ? `<p class="banner">${esc(nudge)}</p>` : ""}
+  <section class="card"><h2 class="i-h">Bill details</h2>
+    <div class="sumrow"><span>Items total</span><span>${rupee(b.sub)}</span></div>
+    <div class="sumrow"><span>Delivery fee</span><span>${b.delivery ? rupee(b.delivery) : "<b class='ok'>FREE</b>"}</span></div>
+    <div class="sumrow tot"><span>To pay</span><strong>${rupee(b.total)}</strong></div></section>
+  <section class="card"><h2 class="i-h">Delivering to</h2>${c.addr ? `<p><b>${esc(c.addr.label)}</b> · ${esc(c.addr.name || "")}<br><span class="note">${esc(addrText(c.addr))}</span></p>` : `<p class="note">No address yet.</p>`}
+    <button class="ghost" data-act="iGoAddr">${c.addr ? "Change address" : "Add address"}</button></section>
+  <section class="card"><h2 class="i-h">Payment</h2>
+    ${[["upi", "UPI", "Pay with PhonePe, Google Pay or Paytm after you place the order"], ["cod", "Cash on delivery", "Pay the rider in cash"]].map(([k, n, d]) => `<label class="choice i-pay"><input type="radio" name="ipay" value="${k}" data-act="iPay" data-id="${k}" ${I.pay === k ? "checked" : ""}><span><b>${n}</b><br><small class="note">${d}</small></span></label>`).join("")}</section>
+  <p class="err" id="err" role="alert"></p>
+  <div class="i-stick"><button class="primary wide big" data-act="${st.act || "iNone"}" data-id="${esc(st.arg || "")}" ${st.act ? "" : "disabled"}>${esc(st.label)}</button></div>`;
+}
+function viewIAddr(){
+  const head = iBack(I.back || "i_home", "Delivery address");
+  const showForm = I.addrNew || !I.addrs.length, d = I.draft || {}, c = curShop();
+  const list = I.addrs.length ? `<ul class="olist">${I.addrs.map(a => `<li class="order ${a.id === I.addrId ? "paid" : ""}"><div class="ohead"><strong>${esc(a.label)}</strong>${a.id === I.addrId ? `<span class="chip">Selected</span>` : ""}</div>
+      <p class="items">${esc(a.name || "")} ${esc(a.phone || "")}<br>${esc(addrText(a))}</p>
+      <div class="actions">${a.id === I.addrId ? "" : `<button class="yes" data-act="iPickAddr" data-id="${esc(a.id)}">Deliver here</button>`}<button data-act="iDelAddr" data-id="${esc(a.id)}">Delete</button></div></li>`).join("")}</ul>
+      ${showForm ? "" : `<button class="primary wide" data-act="iNewAddr">Add new address</button>`}` : "";
+  if (!showForm) return head + list;
+  const ds = d.lat != null ? (() => { const sh = (I.shops || []).map(s => ({ s, k:kmBetween(s.lat, s.lng, d.lat, d.lng) })).sort((x, y) => x.k - y.k)[0]; return sh ? `${r1(sh.k)} km from ${esc(sh.s.name)}. ${sh.k > Number(sh.s.radius_km) ? `<b class="bad">Outside our delivery area (${sh.s.radius_km} km).</b>` : "<b class='ok'>We deliver here.</b>"}` : ""; })() : "";
+  return head + list + `<section class="card form"><h2 class="i-h">New address</h2>
+    <button class="primary wide" data-act="iLocate">${d.lat != null ? "Update my location" : "Use my current location"}</button>
+    ${d.lat != null ? `<p class="note">Location saved${d.acc ? `, accurate to about ${d.acc} m` : ""}. <a href="https://maps.google.com/?q=${d.lat},${d.lng}" target="_blank" rel="noopener">Check on map</a><br>${ds}</p>` : `<p class="note">Stand at the delivery spot and tap the button. Allow location when your phone asks.</p>`}
+    <div class="chips" role="group">${["Home", "Work", "Other"].map(l => `<button class="chip-btn" data-act="iLabel" data-id="${l}" aria-pressed="${d.label === l}">${l}</button>`).join("")}</div>
+    <label>House / flat no. and building<input class="in" id="ia-house" autocomplete="address-line1" value="${esc(d.house || "")}"></label>
+    <label>Area, street<input class="in" id="ia-area" autocomplete="address-line2" value="${esc(d.area || "")}"></label>
+    <label>Landmark (optional)<input class="in" id="ia-landmark" value="${esc(d.landmark || "")}"></label>
+    <label>Receiver's name<input class="in" id="ia-name" autocomplete="name" value="${esc(d.name || (I.user && I.user.name) || "")}"></label>
+    <label>Receiver's mobile<input class="in" id="ia-phone" type="tel" inputmode="numeric" maxlength="10" autocomplete="tel-national" value="${esc(d.phone || "")}"></label>
+    <p class="err" id="err" role="alert"></p>
+    <button class="primary wide big" data-act="iSaveAddr">Save address</button>
+    ${I.addrs.length ? `<button class="link" data-act="iCancelAddr">Cancel</button>` : ""}</section>`;
+}
+function readAddrForm(){
+  const g = id => { const e = document.getElementById(id); return e ? e.value.trim() : undefined; };
+  ["house", "area", "landmark", "name", "phone"].forEach(k => { const v = g("ia-" + k); if (v !== undefined) I.draft[k] = v; });
+}
+const ordTotalLine = o => `${rupee(o.total)}`;
+function itemsText(o){ return (o.order_items || []).map(i => `${esc(i.name)} ${iq(i.unit, Number(i.qty))}`).join(", "); }
+function payState(o){
+  if (o.status === "cancelled") return "";
+  if (o.payment_method === "cod") return o.payment_status === "paid" ? "Paid in cash" : `Pay ${exactRupee(o.total)} in cash to the rider`;
+  return { pending:"Payment pending", to_verify:"Checking your payment", paid:"Paid", failed:"Payment not found", refunded:"Refunded" }[o.payment_status] || o.payment_status;
+}
+function viewITrack(){
+  const o = I.orders.find(x => x.id === I.track);
+  const head = iBack("i_home", o ? "Order #" + o.id : "Order");
+  if (!o) return head + `<ul class="grid" style="grid-template-columns:1fr">${estate("receipt", "Order not found", "", `<button class="primary" data-act="iGo" data-id="i_orders">${esc(t("myOrders"))}</button>`)}</ul>`;
+  const cancelled = o.status === "cancelled", idx = I_STEPS.indexOf(o.status), upi = o.payment_method === "upi" && !cancelled;
+  const needPay = upi && (o.payment_status === "pending" || o.payment_status === "failed");
+  return head + `<section class="card i-status ${cancelled ? "bad" : ""}"><h1>${esc(I_HEAD[o.status] || o.status)}</h1>${!cancelled && o.status !== "delivered" ? `<p class="note">Arriving in about ${esc(CONFIG.ETA)} from when it was placed</p>` : ""}
+    ${cancelled ? "" : `<ol class="i-trk" aria-label="Order progress">${I_STEPS.map((s, i) => `<li class="${i < idx || o.status === "delivered" ? "done" : i === idx ? "cur" : "todo"}"><span class="dot">${i < idx || o.status === "delivered" ? ico("check", 14) : ""}</span>${esc(I_LABEL[s])}</li>`).join("")}</ol>`}</section>
+  ${o.rider_name ? `<section class="card i-rider"><div><b>${esc(o.rider_name)}</b><br><span class="note">Your delivery partner</span></div>${o.rider_phone ? `<a class="callbtn" href="tel:${esc(o.rider_phone)}">${ico("phone", 18)}<span>Call</span></a>` : ""}</section>` : ""}
+  ${upi ? `<section class="card i-paybox"><h2 class="i-h">Payment</h2>${needPay ? `${o.payment_status === "failed" ? `<p class="err">We couldn't find your payment. Pay again, or tap I've paid if you already did.</p>` : ""}
+      <p>Pay <b>${exactRupee(o.total)}</b> to this UPI ID</p>
+      <div class="qrbox"><div id="i-qr" role="img" aria-label="UPI QR code" data-pay="${esc("FS" + o.id + "|" + o.total)}"></div>
+        <div class="upi"><code>${esc(upiId())}</code><button class="ghost" data-act="iCopyUpi">Copy</button></div>
+        <p class="note">Scan the QR from another phone, or copy the UPI ID and pay in PhonePe, Google Pay or Paytm. Put FS${o.id} in the note if you can.</p></div>
+      <button class="primary wide big" data-act="iPaidUpi" data-id="${o.id}">I've paid ${exactRupee(o.total)}</button>`
+    : `<p class="paymsg ${o.payment_status === "paid" ? "ok" : ""}" role="status">${esc(payState(o))}</p>`}</section>`
+    : `<section class="card"><p class="paymsg ${o.payment_status === "paid" ? "ok" : ""}">${esc(payState(o))}</p></section>`}
+  <section class="card"><h2 class="i-h">Your order</h2><ul class="lines">${(o.order_items || []).map(i => `<li><span>${esc(i.name)} <em>${iq(i.unit, Number(i.qty))}</em></span><span>${rupee(i.line_total)}</span></li>`).join("")}</ul>
+    <div class="sumrow"><span>Delivery fee</span><span>${Number(o.delivery_fee) ? rupee(o.delivery_fee) : "FREE"}</span></div>
+    <div class="sumrow tot"><span>Total</span><strong>${exactRupee(o.total)}</strong></div>
+    <p class="note">Delivering to ${esc((o.address || {}).label || "")}: ${esc(addrText(o.address))}</p><p class="note">Placed ${esc(placedAt(o.created_at))}</p></section>
+  ${o.status === "placed" ? `<button class="ghost wide" data-act="iCancel" data-id="${o.id}">Cancel order</button>` : ""}
+  <button class="primary wide" data-act="iReorder" data-id="${o.id}">Order again</button>`;
+}
+function viewIOrders(){
+  const head = iBack("i_home", t("myOrders"));
+  if (!loggedIn()) return head + `<ul class="grid" style="grid-template-columns:1fr">${estate("receipt", "Log in to see your orders", "", `<button class="primary" data-act="iSignIn" data-id="home">${SB_ON() ? "Continue with Google" : "Continue as demo customer"}</button>`)}</ul>`;
+  if (!I.orders.length) return head + `<ul class="grid" style="grid-template-columns:1fr">${estate("receipt", t("noOrders"), t("noOrdersS"), `<button class="primary" data-act="iGo" data-id="i_home">${esc(t("chooseFruit"))}</button>`)}</ul>`;
+  return head + `<ul class="olist">${I.orders.map(o => `<li class="order ${o.status === "delivered" ? "picked" : o.status === "cancelled" ? "rejected" : "pending"}"><button class="i-ord" data-act="iOpen" data-id="${o.id}">
+      <div class="ohead"><strong>#${o.id}</strong><span class="chip">${esc(I_LABEL[o.status] || o.status)}</span></div>
+      <p class="items">${itemsText(o)}</p><p class="oamt">${rupee(o.total)} <span class="note">· ${esc(placedAt(o.created_at))}</span></p></button></li>`).join("")}</ul>
+    <footer class="foot"><button class="link" data-act="iSignOut">Log out</button></footer>`;
+}
+
+/* --- Customer actions --- */
+const iStart = p => (p.step < 1 ? 1 : p.step);
+Object.assign(ACTIONS, {
+  iGo(v){ I.back = S.view === "i_cart" || S.view === "i_home" ? S.view : "i_home"; if (v === "i_orders" && loggedIn()) instOrdersRefresh(); S.view = v; render(); },
+  iGoAddr(){ I.back = "i_cart"; I.addrNew = false; I.draft = { label:"Home" }; S.view = "i_addr"; render(); },
+  iReload: async () => { I.ready = false; render(); await instCatalog(); I.ready = true; render(); },
+  iBrowse(){ LS.set("fs_i_seen", true); S.view = "i_home"; render(); },
+  iCat(c){ I.cat = c; iRepaintGrid(); },
+  iClearQ(){ I.q = ""; const i = document.getElementById("i-q"); if (i) i.value = ""; iRepaintGrid(); },
+  iAdd(id){ const p = shopProds().find(x => x.id === id); if (!p || !p.in_stock) return; I.cart[id] = I.cart[id] ? r2(I.cart[id] + p.step) : iStart(p); saveCart(); iRefreshRow(id); },
+  iDec(id){ const p = shopProds().find(x => x.id === id); if (!p) return; const q = r2((I.cart[id] || 0) - p.step); if (q <= 0) delete I.cart[id]; else I.cart[id] = q; saveCart(); iRefreshRow(id); },
+  iAddC(id){ ACTIONS.iAdd(id); render(); },
+  iDecC(id){ ACTIONS.iDec(id); render(); },
+  iPay(k){ I.pay = k; LS.set("fs_ipay", k); },
+  iNone(){},
+  async iSignIn(arg){
+    LS.set("fs_i_seen", true); LS.set("fs_i_after", arg === "cart" ? "cart" : arg === "owner" ? "owner" : "home");
+    if (SB_ON()) return SB.google();
+    I.user = { id:"demo", name:"Demo customer" }; LS.set("fs_i_user", I.user); await instAccount();
+    S.view = arg === "cart" ? "i_cart" : arg === "owner" ? "owner" : "i_home"; render(); if (arg === "owner") instOwnerLoad(true);
+  },
+  async iSignOut(){ if (SB_ON()) SB.save(null); else { I.user = null; LS.set("fs_i_user", null); } I.orders = []; I.addrs = []; I.addrId = ""; S.view = "i_home"; render(); },
+  iNewAddr(){ I.addrNew = true; I.draft = { label:"Home" }; render(); },
+  iCancelAddr(){ I.addrNew = false; render(); },
+  iLabel(l){ readAddrForm(); I.draft.label = l; render(); },
+  iPickAddr(id){ I.addrId = id; LS.set("fs_iaddr", id); S.view = I.back === "i_cart" ? "i_cart" : "i_home"; render(); },
+  async iDelAddr(id){ try { await IB.deleteAddress(id); I.addrs = I.addrs.filter(a => a.id !== id); if (I.addrId === id){ I.addrId = I.addrs[0] ? I.addrs[0].id : ""; LS.set("fs_iaddr", I.addrId); } render(); } catch(e){ toast(niceError(e.message), "err"); } },
+  iLocate(){
+    readAddrForm();
+    const done = (lat, lng, acc) => { I.draft.lat = lat; I.draft.lng = lng; I.draft.acc = acc; render(); };
+    const fail = () => { if (!SB_ON()){ const s = I.shops[0]; done(s.lat + .004, s.lng + .004, 0); } else toast("Couldn't get your location. Allow location access and try again.", "err"); };
+    if (!navigator.geolocation) return fail();
+    toast("Finding your location…");
+    navigator.geolocation.getCurrentPosition(p => done(p.coords.latitude, p.coords.longitude, Math.round(p.coords.accuracy)), fail, { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
+  },
+  async iSaveAddr(_, __, btn){
+    readAddrForm(); const d = I.draft;
+    if (d.lat == null) return setErr("Tap Use my current location first.");
+    if (!d.house || d.house.length < 2) return setErr("Enter the house or flat number.");
+    if (!d.name) return setErr("Enter the receiver's name.");
+    const phone = String(d.phone || "").replace(/\D/g, ""); if (!/^[6-9]\d{9}$/.test(phone)) return setErr("Enter a 10-digit mobile number.");
+    btn.disabled = true; setErr("");
+    try {
+      const a = await IB.saveAddress({ label:d.label || "Home", name:d.name, phone, house:d.house, area:d.area || "", landmark:d.landmark || "", lat:d.lat, lng:d.lng, is_default:!I.addrs.length });
+      I.addrs.unshift(a); I.addrId = a.id; LS.set("fs_iaddr", a.id); I.addrNew = false; I.draft = { label:"Home" };
+      S.view = I.back === "i_cart" ? "i_cart" : "i_home"; render(); toast("Address saved");
+    } catch(e){ btn.disabled = false; setErr(e.message); }
+  },
+  async iPlace(_, __, btn){
+    if (I.placing) return; const st = iPlaceState(); if (st.act !== "iPlace") return;
+    const b = iBill(), c = curShop(); I.placing = true; btn.disabled = true; btn.textContent = "Placing your order…"; setErr("");
+    try {
+      const o = await IB.place({ shop:c.shop, addr:c.addr, items:b.L.map(l => ({ id:l.p.id, qty:l.qty })), method:I.pay });
+      I.cart = {}; saveCart(); I.track = o.id; await instOrdersRefresh(); S.view = "i_track"; render();
+    } catch(e){ setErr(e.message); btn.disabled = false; btn.textContent = st.label; if (/closed|outside|stock|Minimum|sold here|Bad quantity/i.test(e.message)) instCatalog(); }
+    finally { I.placing = false; }
+  },
+  iOpen(id){ I.track = Number(id) || id; S.view = "i_track"; render(); },
+  async iPaidUpi(id, _, btn){ if (btn) btn.disabled = true; try { await IB.paidUpi(Number(id) || id); await instOrdersRefresh(); render(); toast("Thanks! We're checking your payment."); } catch(e){ if (btn) btn.disabled = false; toast(niceError(e.message), "err"); } },
+  async iCancel(id){ if (!confirm("Cancel this order?")) return; try { await IB.cancel(Number(id) || id); await instOrdersRefresh(); render(); toast("Order cancelled"); } catch(e){ toast(niceError(e.message), "err"); } },
+  async iCopyUpi(){ try { await navigator.clipboard.writeText(upiId()); toast("UPI ID copied"); } catch(e){ toast("Copy didn't work. Type the UPI ID: " + upiId()); } },
+  iReorder(id){
+    const o = I.orders.find(x => x.id === Number(id) || x.id === id); if (!o) return; let n = 0;
+    (o.order_items || []).forEach(i => { const p = shopProds().find(x => x.id === i.product_id); if (p && p.in_stock){ I.cart[p.id] = Number(i.qty); n++; } });
+    saveCart(); S.view = n ? "i_cart" : "i_home"; render(); toast(n ? "Added to your cart" : "Those fruits aren't available now", n ? "ok" : "err");
+  }
+});
+async function instOrdersRefresh(){ if (!loggedIn()) return false; try { const n = await IB.orders(), ch = sigOf(n) !== sigOf(I.orders); I.orders = n; return ch; } catch(e){ return false; } }
+document.addEventListener("input", e => { if (e.target.id === "i-q"){ I.q = e.target.value; clearTimeout(iQTimer); iQTimer = setTimeout(iRepaintGrid, 150); } });
+let iQTimer;
+
+/* --- Shop side: live orders, with a beep for each new one --- */
+function beep(){
+  try {
+    const C = window.AudioContext || window.webkitAudioContext; const ctx = I.ac || (I.ac = new C()); if (ctx.state === "suspended") ctx.resume();
+    [0, .3, .6].forEach(d => { const o = ctx.createOscillator(), g = ctx.createGain(), t0 = ctx.currentTime + d; o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(.001, t0); g.gain.exponentialRampToValueAtTime(.4, t0 + .03); g.gain.exponentialRampToValueAtTime(.001, t0 + .22); o.start(t0); o.stop(t0 + .25); });
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  } catch(e){}
+}
+document.addEventListener("click", () => { try { if (!I.ac){ const C = window.AudioContext || window.webkitAudioContext; if (C) I.ac = new C(); } } catch(e){} }, { once:true });
+async function instOwnerLoad(){
+  const O = I.own; if (O.busy) return; O.busy = true;
+  try {
+    if (SB_ON() && !SB.sess){ O.ready = true; O.orders = []; O.staff = null; if (S.view === "owner") render(); return; }
+    const r = await IB.ownerLoad(), first = !O.seen;
+    const fresh = r.orders.filter(o => o.status === "placed" && O.seen && !O.seen.has(o.id));
+    const changed = sigOf(r.orders) !== sigOf(O.orders) || !O.ready || O.err;
+    O.orders = r.orders.map(o => ({ ...o, order_items:o.order_items || [] })); O.staff = r.staff; O.ready = true; O.err = ""; O.seen = new Set(r.orders.map(o => o.id));
+    if (!first && fresh.length){ beep(); toast("New order #" + fresh[0].id); }
+    if (changed && S.view === "owner" && S.ownerTab === "orders" && !typing()) render();
+  } catch(e){ O.ready = true; O.err = niceError(e.message, "Couldn't load orders."); if (S.view === "owner" && S.ownerTab === "orders" && !typing()) render(); }
+  finally { O.busy = false; }
+}
+const ownerShops = () => (I.own.staff || []).map(s => s.shop_id);
+function payChip(o){
+  if (o.status === "cancelled") return "";
+  if (o.payment_method === "cod") return o.payment_status === "paid" ? `<span class="chip ok">Cash received</span>` : `<span class="chip">Cash on delivery ${rupee(o.total)}</span>`;
+  const m = { pending:"Customer hasn't paid yet", to_verify:"Check PhonePe: " + exactRupee(o.total), paid:"UPI paid", failed:"UPI not received" };
+  return `<span class="chip ${o.payment_status === "to_verify" ? "warn" : o.payment_status === "paid" ? "ok" : ""}">${esc(m[o.payment_status] || o.payment_status)}</span>`;
+}
+function liveCard(o){
+  const a = o.address || {}, payOk = o.payment_method === "cod" || o.payment_status === "paid", sn = shopName(o.shop_id);
+  let btns = "";
+  const B = (k, label, cls) => `<button class="${cls || ""}" data-act="oDo" data-id="${o.id}" data-arg="${k}">${label}</button>`;
+  if (o.status === "placed"){
+    if (o.payment_method === "upi" && o.payment_status === "to_verify") btns = B("payok", "Payment received", "yes") + B("payno", "Not received");
+    else if (o.payment_method === "upi" && !payOk) btns = `<span class="note">Waiting for the customer to pay</span>`;
+    btns += payOk ? B("accept", "Accept order", "yes") : "";
+    btns += B("reject", "Reject");
+  } else if (o.status === "accepted") btns = B("packed", "Packed", "yes");
+  else if (o.status === "packed") btns = `<div class="i-rider-in"><input class="in" id="rn-${o.id}" placeholder="Rider name" value="${esc(LS.get("fs_i_rider", {}).name || "")}"><input class="in" id="rp-${o.id}" type="tel" inputmode="numeric" maxlength="10" placeholder="Rider mobile" value="${esc(LS.get("fs_i_rider", {}).phone || "")}"></div>${B("out", "Out for delivery", "yes")}`;
+  else if (o.status === "out_for_delivery") btns = B("delivered", o.payment_method === "cod" && o.payment_status !== "paid" ? "Delivered, cash collected" : "Delivered", "yes");
+  return `<li class="order ${o.status === "placed" ? "pending" : o.status === "delivered" ? "picked" : o.status === "cancelled" ? "rejected" : "paid"}">
+    <div class="ohead"><strong>#${o.id}</strong><span class="chip">${esc(I_LABEL[o.status])}</span></div>
+    <div class="who"><span><strong>${esc(a.name || "")}</strong> · ${esc(sn)} · ${esc(placedAt(o.created_at))}</span>${a.phone ? `<a class="callbtn" href="tel:${esc(a.phone)}" aria-label="Call customer">${ico("phone", 18)}<span>${esc(a.phone)}</span></a>` : ""}</div>
+    <p class="items">${itemsText(o)}</p><p class="oamt">${exactRupee(o.total)} ${payChip(o)}</p>
+    <p class="note">${esc(addrText(a))}${a.lat != null ? ` · <a href="https://maps.google.com/?q=${a.lat},${a.lng}" target="_blank" rel="noopener">Open map</a>` : ""}</p>
+    ${o.rider_name ? `<p class="note">Rider: ${esc(o.rider_name)} ${esc(o.rider_phone || "")}</p>` : ""}
+    ${btns ? `<div class="actions">${btns}</div>` : ""}</li>`;
+}
+function ownerLiveHtml(){
+  const O = I.own;
+  if (SB_ON() && !SB.sess) return `<section class="card"><p>Sign in with the Google account you added as owner. You stay signed in on this phone.</p><button class="primary wide" data-act="iSignIn" data-id="owner">Sign in with Google</button></section>`;
+  if (!O.ready) return `<p class="empty">Loading orders…</p>`;
+  if (O.err) return `<section class="card"><p class="err">${esc(O.err)}</p><button class="primary" data-act="refresh">Try again</button></section>`;
+  if (SB_ON() && !(O.staff || []).length) return `<section class="card"><p>This Google account isn't set up as owner yet. Add its user id to the <b>staff</b> table (steps are at the bottom of schema.sql).</p></section>`;
+  const mine = O.orders.filter(o => S.ownerShop === "all" || o.shop_id === S.ownerShop);
+  const active = mine.filter(o => ["placed", "accepted", "packed", "out_for_delivery"].includes(o.status)), done = mine.filter(o => !active.includes(o));
+  const sub = O.sub, shops = I.shops.filter(s => ownerShops().includes(s.id));
+  const subTabs = [["active", `Live (${active.length})`], ["done", `Done today (${done.length})`], ["items", "Items & prices"]].map(([k, l]) => `<button class="chip-btn" data-act="oSub" data-id="${k}" aria-pressed="${sub === k}">${l}</button>`).join("");
+  const top = `<div class="i-ownbar"><select class="in" id="o-shop" aria-label="Shop"><option value="all">All shops</option>${shops.map(s => `<option value="${s.id}" ${S.ownerShop === s.id ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select>
+    ${shops.map(s => `<button class="ghost" data-act="oOpen" data-id="${s.id}">${esc(s.name.split(" ").slice(0, 2).join(" "))}: ${s.is_open === false ? "Closed" : "Open"}</button>`).join("")}</div><div class="chips" role="group">${subTabs}</div>`;
+  if (sub === "items"){
+    const sid = S.ownerShop !== "all" ? S.ownerShop : (shops[0] || {}).id, list = I.prods[sid] || [];
+    return top + `<p class="note">Prices for ${esc(shopName(sid))}${S.ownerShop === "all" ? ". Pick a shop above to edit the other one." : ""}</p><ul class="olist">${list.map(p => `<li class="order"><div class="ohead"><strong>${esc(p.name)}</strong><span class="chip">per ${p.unit === "pc" ? "piece" : "kg"}</span></div>
+      <div class="actions"><label class="i-pin">₹<input class="in" type="number" inputmode="decimal" min="1" step="1" value="${p.price}" data-iprice="${esc(sid + "|" + p.id)}"></label>
+      <button class="${p.in_stock ? "yes" : ""}" data-act="oStock" data-id="${esc(sid + "|" + p.id)}">${p.in_stock ? "In stock" : "Out of stock"}</button></div></li>`).join("")}</ul>`;
+  }
+  const list = sub === "done" ? done.slice().reverse() : active;
+  return top + (list.length ? `<ul class="olist">${list.map(liveCard).join("")}</ul>` : `<ul class="grid" style="grid-template-columns:1fr">${estate("receipt", sub === "done" ? "Nothing finished yet today" : "No live orders", "New orders appear here and beep.")}</ul>`)
+    + `<p class="note" style="margin-top:12px">${SB_ON() ? "Updates every few seconds." : "Demo: orders placed on this phone show here."}</p>`;
+}
+const oFind = id => I.own.orders.find(o => o.id === Number(id) || o.id === id);
+async function oRun(fn, okMsg){ try { await fn(); await instOwnerLoad(); render(); if (okMsg) toast(okMsg); } catch(e){ toast(niceError(e.message), "err"); } }
+Object.assign(ACTIONS, {
+  oSub(k){ I.own.sub = k; render(); },
+  async oDo(id, kind, btn){
+    const o = oFind(id); if (!o) return; if (btn) btn.disabled = true; const n = o.id;
+    if (kind === "accept") return oRun(() => IB.setStatus(n, { status:"accepted" }), "Order accepted");
+    if (kind === "reject"){ if (!confirm("Reject order #" + n + "?")) { if (btn) btn.disabled = false; return; } return oRun(() => IB.setStatus(n, { status:"cancelled" }), "Order rejected"); }
+    if (kind === "payok") return oRun(() => IB.confirmUpi(n, true), "Payment confirmed");
+    if (kind === "payno") return oRun(() => IB.confirmUpi(n, false), "Marked not received");
+    if (kind === "packed") return oRun(() => IB.setStatus(n, { status:"packed" }), "Marked packed");
+    if (kind === "out"){
+      const name = (document.getElementById("rn-" + n) || {}).value || "", ph = ((document.getElementById("rp-" + n) || {}).value || "").replace(/\D/g, "");
+      if (!name.trim()){ if (btn) btn.disabled = false; return toast("Enter the rider's name", "err"); }
+      if (ph && !/^[6-9]\d{9}$/.test(ph)){ if (btn) btn.disabled = false; return toast("Enter a 10-digit rider mobile, or leave it empty", "err"); }
+      LS.set("fs_i_rider", { name:name.trim(), phone:ph });
+      return oRun(() => IB.setStatus(n, { status:"out_for_delivery", rider_name:name.trim(), rider_phone:ph || null }), "Out for delivery");
+    }
+    if (kind === "delivered") return oRun(async () => { if (o.payment_method === "cod" && o.payment_status !== "paid") await IB.codPaid(n); await IB.setStatus(n, { status:"delivered" }); }, "Delivered");
+  },
+  async oOpen(id){ const s = I.shops.find(x => x.id === id); if (!s) return; const open = s.is_open === false; oRun(async () => { await IB.setOpen(id, open); s.is_open = open; }, open ? "Shop opened" : "Shop closed"); },
+  async oStock(key){
+    const [sid, pid] = key.split("|"), p = (I.prods[sid] || []).find(x => x.id === pid); if (!p) return;
+    oRun(async () => { await IB.saveProd(sid, pid, { in_stock:!p.in_stock }); p.in_stock = !p.in_stock; }, p.in_stock ? "In stock" : "Marked out of stock");
+  }
+});
+document.addEventListener("change", async e => {
+  const k = e.target.dataset && e.target.dataset.iprice; if (!k) return;
+  const [sid, pid] = k.split("|"), p = (I.prods[sid] || []).find(x => x.id === pid), v = Number(e.target.value);
+  if (!p) return; if (!(v > 0)){ e.target.value = p.price; return toast("Enter a price above zero", "err"); }
+  try { await IB.saveProd(sid, pid, { price:v }); p.price = v; toast(p.name + " now ₹" + v); } catch(err){ e.target.value = p.price; toast(niceError(err.message), "err"); }
+});
+
+/* --- Keep screens fresh: customer order tracking and the shop's board --- */
+let instTimer;
+function startTick(){ clearInterval(instTimer); instTimer = setInterval(instTick, SB_ON() ? 7000 : 3000); }
+async function instTick(){
+  if (document.hidden) return;
+  try {
+    if ((S.view === "i_track" || S.view === "i_orders") && loggedIn()){ if (await instOrdersRefresh() && !typing()) render(); }
+    else if (S.view === "owner" && S.ownerTab === "orders") await instOwnerLoad();
+  } catch(e){}
+}
+/* Called after every render */
+function instAfterRender(){
+  const q = document.getElementById("i-qr");
+  if (q){ try { const [id, total] = q.dataset.pay.split("|"), c = qrcode(0, "M"); c.addData(upiUrl({ id, total:Number(total) }).replace(/pa=[^&]*/, "pa=" + encodeURIComponent(upiId()))); c.make(); q.innerHTML = c.createSvgTag({ cellSize:4, margin:0, scalable:true }); } catch(e){ q.innerHTML = ""; } }
+  if (S.view === "owner" && S.ownerTab === "orders" && !I.own.ready && !I.own.busy) instOwnerLoad();
+  const n = I.own.orders.filter(o => o.status === "placed").length;
+  document.title = S.view === "owner" && n ? `(${n}) New orders · FruitClub` : "FruitClub";
+}
+if (INST()) Object.assign(VIEWS, { i_login:viewILogin, i_home:viewIHome, i_cart:viewICart, i_addr:viewIAddr, i_track:viewITrack, i_orders:viewIOrders });
+
+/* Old screens call these names: in instant mode they open the new screens instead. */
+(() => {
+  const g = ACTIONS.go, r = ACTIONS.refresh, lo = ACTIONS.ownerLogout;
+  ACTIONS.go = (v, ...a) => { if (INST() && (v === "shop" || v === "mine" || v === "checkout")){ return ACTIONS.iGo(v === "shop" ? "i_home" : v === "mine" ? "i_orders" : "i_cart"); } return g(v, ...a); };
+  ACTIONS.refresh = async (...a) => { if (INST() && S.view === "owner" && S.ownerTab === "orders"){ await instOwnerLoad(); render(); toast("Up to date"); return; } return r(...a); };
+  ACTIONS.ownerLogout = (...a) => { lo(...a); if (INST()){ S.view = "i_home"; render(); } };
+})();
 document.addEventListener("visibilitychange", () => {   // went to the UPI app and came back: say thanks
   if (S.view !== "done" || S.donePay || !S.upiTried) return;
   if (document.visibilityState === "hidden"){ S.upiLeft = true; clearTimeout(S.upiTimer); return; }
@@ -3056,6 +3656,7 @@ async function refreshFruits(){
   await loadFruits();
   if (S.view === "shop" && before !== JSON.stringify(S.fruits.map(f => [f.id, f.price, f.active, f.storePrice, f.name]))){ shopRefresh(); const cb = document.getElementById("cartbar"); if (cb) cb.innerHTML = cartBar(); }
 }
+if (INST()) instInit();
 (async function init(){
   const cached = REMOTE() ? LS.get("fs_fruits_cache", null) : null;
   if (Array.isArray(cached) && cached.length){ setFruits(cached); render(); await refreshFruits(); }

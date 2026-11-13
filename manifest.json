@@ -1,6 +1,6 @@
 {
-  "name": "FruitSlot Eluru",
-  "short_name": "FruitSlot",
+  "name": "FruitClub Eluru",
+  "short_name": "FruitClub",
   "description": "Order fruit today, pick up fresh tomorrow at 1 Town or 2 Town Rythu Bazar.",
   "start_url": "./",
   "scope": "./",
