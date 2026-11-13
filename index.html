@@ -895,7 +895,7 @@ const CONFIG = {
      The anon key is public by design, the database security rules decide what it can do. NEVER paste the service_role key, Cashfree or WhatsApp secrets here. */
   INSTANT: true,
   SUPABASE_URL: "https://hxgxhgerijfewreltiig.supabase.co",
-  SUPABASE_ANON_KEY: "",       // the public anon key only
+  SUPABASE_ANON_KEY: "sb_publishable_-CIXpbRSnQlG1Rh-dVHlgQ_tPlXdTry",   // public publishable key only, never the secret key
   ETA: "30 min"                // shown as "Delivery in 30 min"
 };
 
@@ -3024,7 +3024,7 @@ const SB = {
     const key = CONFIG.SUPABASE_ANON_KEY;
     let r, text;
     try {
-      r = await fetch(CONFIG.SUPABASE_URL + path, { method:o.method || "GET", headers:{ apikey:key, Authorization:"Bearer " + ((SB.sess && SB.sess.access_token) || key), "Content-Type":"application/json", Prefer:"return=representation" }, body:o.body ? JSON.stringify(o.body) : undefined });
+      r = await fetch(CONFIG.SUPABASE_URL + path, { method:o.method || "GET", headers:{ apikey:key, ...(SB.sess && SB.sess.access_token ? { Authorization:"Bearer " + SB.sess.access_token } : {}), "Content-Type":"application/json", Prefer:"return=representation" }, body:o.body ? JSON.stringify(o.body) : undefined });
       text = await r.text();
     } catch(e){ throw new Error("Couldn't reach the shop. Check your internet and try again."); }
     let j = null; try { j = text ? JSON.parse(text) : null; } catch(e){}
